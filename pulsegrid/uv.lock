@@ -82,6 +82,7 @@ source = { virtual = "services/datapipeline" }
 dependencies = [
     { name = "dotenv" },
     { name = "fastapi", extra = ["standard"] },
+    { name = "pydantic" },
     { name = "pymongo" },
     { name = "python-dotenv" },
     { name = "structlog" },
@@ -91,6 +92,7 @@ dependencies = [
 requires-dist = [
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.140.13" },
+    { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pymongo", specifier = ">=4.17.0" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "structlog", specifier = ">=26.1.0" },

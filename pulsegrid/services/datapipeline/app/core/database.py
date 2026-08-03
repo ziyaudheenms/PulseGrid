@@ -31,3 +31,4 @@ async def get_database():
         return database.client[settings.DATABASE_NAME]
     else:
         logger.error("Could not find the database client", url=settings.DATABASE_URL, db_name=settings.DATABASE_NAME)
+        raise RuntimeError("Database client is not initialized. Ensure connect_to_mongo ran during startup.")
