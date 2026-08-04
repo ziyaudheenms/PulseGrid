@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from core.database import connect_to_mongo, disconnect_from_mongo
-from .core.logging import setup_logging
+from core.logging import setup_logging
 
 setup_logging()
 logger = structlog.get_logger()
