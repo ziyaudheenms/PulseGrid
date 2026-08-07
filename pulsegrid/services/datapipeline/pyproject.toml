@@ -10,5 +10,6 @@ dependencies = [
     "pydantic>=2.13.4",
     "pymongo>=4.17.0",
     "python-dotenv>=1.2.2",
+    "python-multipart>=0.0.32",
     "structlog>=26.1.0",
 ]

@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from core.config import settings
 from api.v1.datapipeline.router import router as datapipeline_router
 
@@ -7,6 +8,31 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION
 )
+
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException):
+
+    origin = request.headers.get("origin")
+
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "status_code": exc.status_code,
+            "message": exc.detail,
+            "data": None
+        }
+    )
+
+    # Manually re-attach headers so the browser doesn't block the error message
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+
+    return response
+
 
 # Register downstream routers
 app.include_router(datapipeline_router, prefix="/api/v1")

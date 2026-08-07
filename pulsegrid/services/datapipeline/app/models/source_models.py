@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
@@ -15,5 +17,6 @@ class SourceModel(BaseModel):
     nationality: str | None = Field(None) #will be considered if the type is 'National'
     source_url: HttpUrl = Field(...)
     source_scope: SourceScope
-
+    created_at: datetime = Field(...)
+    updated_at: datetime = Field(...)
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)

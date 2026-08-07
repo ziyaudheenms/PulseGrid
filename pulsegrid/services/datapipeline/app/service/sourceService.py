@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
-from app.repository.sourceRepository import SourceRepository
-from app.schema.source_schema import SourceSchema
+from repository.sourceRepository import SourceRepository
+from schema.source_schema import SourceSchema
 
 class SourceService:
     def __init__(self, repository: SourceRepository):

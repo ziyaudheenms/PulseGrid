@@ -1,13 +1,14 @@
 import os
 from contextlib import asynccontextmanager
 
+from fastapi.exceptions import RequestValidationError
 import structlog
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from core.database import connect_to_mongo, disconnect_from_mongo
 from core.logging import setup_logging
-
+from api.v1.admin import admin
 setup_logging()
 logger = structlog.get_logger()
 
@@ -20,6 +21,18 @@ async def lifespan(app: FastAPI):  #lifespan is used to do any setup or initiali
 
 
 app = FastAPI(title='PulseGrid',description="Your one-stop solution to stay updated in a fast-pacing world—giving you a clear picture of what's happening, every 8 hours",version="1.00",lifespan=lifespan) #initializes the FastAPI application with the lifespan context manager that connects to and disconnects from the MongoDB database asynchronously
+
+#this block i
+@app.exception_handler(RequestValidationError)
+async def custom_validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "status_code": 422,
+            "message": "Validation Error",
+            "data": exc.errors()  # Contains the list of validation errors
+        }
+    )
 
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
@@ -43,6 +56,10 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
         response.headers["Access-Control-Allow-Headers"] = "*"
 
     return response
+
+
+app.include_router(admin.router, prefix="/api/v1")
+
 
 @app.get('/health-check')
 def start():
