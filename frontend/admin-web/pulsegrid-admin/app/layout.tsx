@@ -9,6 +9,7 @@ import {
   SignUpButton,
   UserButton,
 } from "@clerk/nextjs";
+import { ReduxProvider } from "@/lib/redux/provider";
 
 
 const figtreeHeading = Figtree({subsets:['latin'],variable:'--font-heading'});
@@ -47,7 +48,9 @@ export default function RootLayout({
                 <UserButton />
               </Show>
             </header>*/}
-            {children}
+            <ReduxProvider>
+              {children}
+            </ReduxProvider>
           </ClerkProvider>
         </ThemeProvider>
       </body>

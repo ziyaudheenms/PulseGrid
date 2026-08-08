@@ -23,6 +23,7 @@ class SourceSchema(BaseModel):
     #why lambda? -> datetime.now(timezone.utc) takes an argument (timezone.utc), but default_factory requires a callable that takes zero arguments. Using lambda bridges this gap.
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  #timezone.utc is used so in order to get the geographical data along with the timestamp
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 #this is used to serialize the BJSON formatted responce of the source get endpoint
 class SourceResponceSchema(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
@@ -47,6 +48,12 @@ class SourceResponceSchema(BaseModel):
                 }
         }
     )
+
+#this class is used when creating bulk sources whcih returns there respective ids.
+class SourceIds(BaseModel):
+    inserted_ids: list[str]
+
+
 
 #used to serialize the collection of sources returned by the source get endpoint
 class SourceCollection(BaseModel):

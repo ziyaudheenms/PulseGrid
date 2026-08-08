@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from api.v1.datapipeline.router import router as datapipeline_router
 
@@ -8,7 +9,17 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION
 )
-
+#CORS settings
+origins = [
+    "http://localhost:3000",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
