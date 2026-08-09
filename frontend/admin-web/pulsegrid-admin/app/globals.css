@@ -129,4 +129,7 @@
   html {
     @apply font-sans;
     }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
 }

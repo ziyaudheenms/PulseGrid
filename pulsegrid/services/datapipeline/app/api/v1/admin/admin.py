@@ -9,7 +9,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.post("/source", status_code=status.HTTP_201_CREATED,response_model=ApiResponseSchema[SourceIds])
 async def create_source(
-    source: list[SourceSchema] = Form(...), # the frontend sends a list of sources
+    source: list[SourceSchema] , # the frontend sends a list of sources
     service: SourceService = Depends(get_source_service)
 ):
     """Create a new source in the database used for data ingestion."""

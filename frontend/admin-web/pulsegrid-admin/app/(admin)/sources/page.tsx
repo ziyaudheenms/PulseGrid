@@ -10,21 +10,27 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook"
-import { createSource, updateCreateStore } from "@/features/sourceSlice"
+import { createSource, updateCreateStore, removeTheCreateStoreSource } from "@/features/sourceSlice"
 import { Source, source_scope } from "@/types/source"
 import {
   IconFoldDown,
   IconGlobe,
   IconHome,
   IconList,
+  IconPencil,
   IconUpload,
   IconWorld,
   IconWorldSearch,
+  IconX,
 } from "@tabler/icons-react"
-
+import { useAuth } from "@clerk/nextjs"
+import { Badge } from "@/components/ui/badge"
 
 function Page() {
   // state configs to collect the most and essential state data
@@ -34,7 +40,8 @@ function Page() {
   const [sourceNationality, setSourceNationality] = useState('')
   const [sourceScope, setSourceScope] = useState<source_scope>('Technical')
 
-
+  const { getToken, isLoaded, isSignedIn } = useAuth()
+  const { createSources } = useAppSelector(state => state.source)
   const dispatch = useAppDispatch()
 
   const handleSourceAddition = (e) => {
@@ -60,20 +67,26 @@ function Page() {
     setSourceNationality('')
   }
 
-  const uploadTheSources = (e) => {
+  const uploadTheSources = async (e) => {
     e.preventDefault()
+    const clerkJwtToken = await getToken()
+
     dispatch(
       createSource({
-        token:"your_token_please"
+        token:clerkJwtToken ||''
       })
     )
+  }
+
+  const handleRemoveSource = (index: any) => {
+    dispatch(removeTheCreateStoreSource({ index }))
   }
 
 
   return (
     <div className="mx-auto flex items-center justify-between gap-3 px-16">
       <div className="flex h-screen w-[48%] flex-col justify-center">
-        <div className="">
+        <div className="my-20">
           <h1 className="text-4xl font-bold">Add Sources</h1>
           <p className="text-lg font-light text-gray-600 italic">
             Add new sources to fuel up the pulsegrid data pipeline.
@@ -179,6 +192,40 @@ function Page() {
             Upload The Source
             </Button>
           </div>
+        </div>
+        <div className=" flex flex-col items-center gap-2 w-[60%] h-48 overflow-y-scroll no-scrollbar ">
+          {
+            createSources.data.map((source, index) => (
+              <div key={index} className="flex items-center gap-2 w-full  justify-between">
+                <DropdownMenu key={index}>
+                  <DropdownMenuTrigger render={<Button className={"w-[80%]"} variant="secondary" />}>
+                    {
+                      source.source_name
+                    }
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">Source: </span>{source.source_name}</DropdownMenuItem>
+                      <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">URL: </span>{source.source_url}</DropdownMenuItem>
+                      <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">Type: </span>{source.source_type}</DropdownMenuItem>
+                      <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">Nationality: </span>{source.nationality}</DropdownMenuItem>
+                      <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">Scope: </span>{source.source_scope}</DropdownMenuItem>
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <div className="flex items-center gap-2">
+                  <div className="py-1 px-2 rounded-xl bg-sidebar-accent" onClick={() => {
+                    handleRemoveSource(index)
+                  }}>
+                    <IconX className="text-destructive" stroke={2} />
+                  </div>
+                  <div className="py-1 px-2 rounded-xl bg-sidebar-accent-foreground">
+                    <IconPencil className="text-primary" stroke={2} />
+                  </div>
+                </div>
+              </div>
+            ))
+          }
         </div>
       </div>
       <div>
