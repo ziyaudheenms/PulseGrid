@@ -10,6 +10,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { ReduxProvider } from "@/lib/redux/provider";
+import { Toaster } from "@/components/ui/toast";
 
 
 const figtreeHeading = Figtree({subsets:['latin'],variable:'--font-heading'});
@@ -50,6 +51,7 @@ export default function RootLayout({
             </header>*/}
             <ReduxProvider>
               {children}
+              <Toaster />
             </ReduxProvider>
           </ClerkProvider>
         </ThemeProvider>

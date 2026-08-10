@@ -1,9 +1,7 @@
 "use client"
 import React from "react"
 import { useState } from "react"
-
 import { Input } from "@/components/ui/input"
-
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -17,54 +15,51 @@ import {
 
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook"
 import { createSource, updateCreateStore, removeTheCreateStoreSource } from "@/features/sourceSlice"
-import { Source, source_scope } from "@/types/source"
+import { source_scope } from "@/types/source"
 import {
   IconFoldDown,
   IconGlobe,
   IconHome,
   IconList,
-  IconPencil,
   IconUpload,
   IconWorld,
   IconWorldSearch,
   IconX,
 } from "@tabler/icons-react"
 import { useAuth } from "@clerk/nextjs"
-import { Badge } from "@/components/ui/badge"
+import { Spinner } from "@/components/ui/spinner"
 
 function Page() {
   // state configs to collect the most and essential state data
-  const [sourceName, setSourceName] = useState('')
-  const [sourceURL, setSourceURL] = useState('')
-  const [sourcetype, setSourcetype] = useState('')
-  const [sourceNationality, setSourceNationality] = useState('')
-  const [sourceScope, setSourceScope] = useState<source_scope>('Technical')
+  const [newSource, setNewSource] = useState({
+    source_name: '',
+    source_url: '',
+    source_type: '',
+    source_nationality: '',
+    source_scope: 'Technical',
+  })
 
-  const { getToken, isLoaded, isSignedIn } = useAuth()
+  const { getToken } = useAuth()
+  // managing using redux toolkit
   const { createSources } = useAppSelector(state => state.source)
   const dispatch = useAppDispatch()
 
   const handleSourceAddition = (e) => {
     e.preventDefault()
-    const source_dict = {
-      source_name: sourceName,
-      source_url : sourceURL,
-      source_type : sourcetype,
-      nationality : sourceNationality,
-      source_scope : sourceScope,
-    }
     dispatch(updateCreateStore(  //dispatch funtion is used to tigger the functions defined inside the state to update the state variables
       {
-        sourceDetails: source_dict
+        sourceDetails: newSource
       }
     ))
 
     //Cleaning the input fields after its upload function
-    setSourceName('')
-    setSourceURL('')
-    setSourcetype('')
-    setSourceScope('Technical')
-    setSourceNationality('')
+    setNewSource({
+      source_name: '',
+      source_url: '',
+      source_type: '',
+      source_nationality: '',
+      source_scope: 'Technical',
+    })
   }
 
   const uploadTheSources = async (e) => {
@@ -104,8 +99,8 @@ function Page() {
                   type="text"
                   className="w-full rounded-2xl py-5"
                   placeholder="eg:- TechCrunch"
-                  value={sourceName}
-                  onChange={(e) => setSourceName(e.target.value)}
+                  value={newSource.source_name}
+                  onChange={(e) => setNewSource({ ...newSource, source_name: e.target.value })}
                 />
               </div>
             </div>
@@ -119,8 +114,8 @@ function Page() {
                   type="text"
                   className="w-full rounded-2xl py-5"
                   placeholder="eg:- www.TechCrunch.com"
-                  value={sourceURL}
-                  onChange={(e) => setSourceURL(e.target.value)}
+                  value={newSource.source_url}
+                  onChange={(e) => setNewSource({ ...newSource, source_url: e.target.value })}
                 />
               </div>
             </div>
@@ -134,8 +129,8 @@ function Page() {
                   type="text"
                   className="w-full rounded-2xl py-5"
                   placeholder="eg:- International or National"
-                  value={sourcetype}
-                  onChange={(e) => setSourcetype(e.target.value)}
+                  value={newSource.source_type}
+                  onChange={(e) => setNewSource({ ...newSource, source_type: e.target.value })}
                 />
               </div>
             </div>
@@ -150,8 +145,8 @@ function Page() {
                   type="text"
                   className="w-full rounded-2xl py-5"
                   placeholder="eg:- India or America or Japan"
-                  value={sourceNationality}
-                  onChange={(e) => setSourceNationality(e.target.value)}
+                  value={newSource.source_nationality}
+                  onChange={(e) => setNewSource({ ...newSource, source_nationality: e.target.value })}
                 />
               </div>
             </div>
@@ -163,18 +158,18 @@ function Page() {
                 </div>
                 <DropdownMenu >
                   <DropdownMenuTrigger render={<Button variant="outline" className={"w-[90%] text-left"}/>} className={"text-left"}>
-                     {sourceScope}
+                     {newSource.source_scope}
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuGroup>
                       <DropdownMenuItem onClick={() => {
-                        setSourceScope('Technical')
+                        setNewSource({ ...newSource, source_scope: 'Technical' })
                       }}>Technical</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => {
-                        setSourceScope('Gaming')
+                        setNewSource({ ...newSource, source_scope: 'Gaming' })
                       }}>Gaming</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => {
-                        setSourceScope('Cinema')
+                        setNewSource({ ...newSource, source_scope: 'Cinema' })
                       }}>Cinema</DropdownMenuItem>
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
@@ -187,8 +182,11 @@ function Page() {
             <IconList stroke={2} className="text-xl" />
             Add Source To The List
           </Button>
-          <Button className="mt-5 flex w-full items-center gap-2 py-5 bg-sidebar-accent" onClick={(e) => uploadTheSources(e)}>
-            <IconUpload stroke={2} className="text-xl" />
+            <Button className="mt-5 flex w-full items-center gap-2 py-5 dark:bg-sidebar-accent bg-destructive" onClick={(e) => uploadTheSources(e)}>
+              {
+                createSources.isLoading ? <Spinner className="text-primary"/> : <IconUpload stroke={2} className="text-xl" />
+              }
+
             Upload The Source
             </Button>
           </div>
@@ -198,7 +196,7 @@ function Page() {
             createSources.data.map((source, index) => (
               <div key={index} className="flex items-center gap-2 w-full  justify-between">
                 <DropdownMenu key={index}>
-                  <DropdownMenuTrigger render={<Button className={"w-[80%]"} variant="secondary" />}>
+                  <DropdownMenuTrigger render={<Button className={"w-[90%]"} variant="secondary" />}>
                     {
                       source.source_name
                     }
@@ -208,7 +206,7 @@ function Page() {
                       <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">Source: </span>{source.source_name}</DropdownMenuItem>
                       <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">URL: </span>{source.source_url}</DropdownMenuItem>
                       <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">Type: </span>{source.source_type}</DropdownMenuItem>
-                      <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">Nationality: </span>{source.nationality}</DropdownMenuItem>
+                      <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">Nationality: </span>{source.source_nationality}</DropdownMenuItem>
                       <DropdownMenuItem><span className="font-medium text-l font-sans text-destructive">Scope: </span>{source.source_scope}</DropdownMenuItem>
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
@@ -218,9 +216,6 @@ function Page() {
                     handleRemoveSource(index)
                   }}>
                     <IconX className="text-destructive" stroke={2} />
-                  </div>
-                  <div className="py-1 px-2 rounded-xl bg-sidebar-accent-foreground">
-                    <IconPencil className="text-primary" stroke={2} />
                   </div>
                 </div>
               </div>

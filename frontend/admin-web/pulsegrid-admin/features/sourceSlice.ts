@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
 import { Source } from "@/types/source"
 import { RootState } from "@/store/store"
+import { toast } from "@/components/ui/toast"
 
 interface createSourceArgs {
   token: string
@@ -55,6 +56,12 @@ export const sourceSlice = createSlice({
       const { sourceDetails } = action.payload
       state.createSources.data = [...state.createSources.data, sourceDetails] //sourceDetails will be added into the exisiting data
       console.log(state.createSources.data, "added data suuccessfully")
+      toast.add({
+        title: "Added the Source",
+        description: "Source added successfully to the list",
+        type: "info"
+
+      })
     },
 
     removeTheCreateStoreSource: (state, action) => {
@@ -72,7 +79,12 @@ export const sourceSlice = createSlice({
         state.createSources.isLoading = false
         const response = action.payload
         if (response.status_code === 201) {
-          console.log(response.data)
+          toast.add({
+            title: "Populated the Source ",
+            description: "Successfully populated the source to the data pipeline",
+            type: "success"
+
+          })
         }
       })
       .addCase(createSource.rejected, (state, action) => {
