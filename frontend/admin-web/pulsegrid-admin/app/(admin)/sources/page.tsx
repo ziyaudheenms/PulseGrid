@@ -8,14 +8,11 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook"
 import { createSource, updateCreateStore, removeTheCreateStoreSource } from "@/features/sourceSlice"
-import { source_scope } from "@/types/source"
 import {
   IconFoldDown,
   IconGlobe,
@@ -82,7 +79,7 @@ function Page() {
   return (
     <div className="mx-auto flex items-center justify-center md:justify-between gap-3 px-2 md:px-16">
       <div className="flex h-screen sm:w-full md:w-[48%] flex-col justify-center">
-        <div className="my-14">
+        <div className="my-10">
           <h1 className="text-4xl font-black font-serif tracking-tight italic">Add Sources</h1>
           <p className="text-lg font-medium text-slate-600 mt-2 max-w-xl leading-relaxed">
             Add new sources to fuel up the pulsegrid data pipeline.
@@ -244,17 +241,8 @@ function Page() {
           }
         </div>
       </div>
-      <div className="group">
-        <AsciiArt 
-        src="/logo.png"
-        resolution={100}
-        color="var(--color-neutral-500)"
-        animationStyle="fade"
-        animationDuration={1.5}
-        animateOnView={false}
-        className="mx-auto aspect-square w-full max-w-lg bg-neutral-950 group-hover:hidden transition-all duration-300 ease-in"
-        />
-        <img src="/logo.png" alt="sources" className="hidden opacity-0 group-hover:block group-hover:opacity-100 animate-in transition-all duration-700 ease-in-out" />
+      <div className="py-5 w-[48%] h-screen flex items-center">
+        <img src="/logo.png" alt="sources" className="animate-in transition-all duration-700 ease-in-out" />
       </div>
     </div>
   )

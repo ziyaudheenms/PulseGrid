@@ -27,6 +27,7 @@ async def datapipeline_route(
     path: str,
     user_state: Annotated[RequestState, Depends(require_system_role("admin"))],  #this checks for whether the user requesting has this particular role or not
 ):
+    print("entered into the router api.......")
     url = f"{settings.DATAPIPELINE_SERVICE_URL}/api/{settings.DATAPIPELINE_VERSION}/{path}"
     #redirect the request to the datapipeline service through the proxy request function.
     response = await proxy_request(url, request, "datapipeline")

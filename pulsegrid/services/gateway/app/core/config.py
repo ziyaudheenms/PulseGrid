@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     #Authentication parameters for clerk based SDK
     # clerk_secret_key: str
-    CLERK_SECRET_KEY: str | None = None
+    CLERK_SECRET_KEY: str | None = 'sk_test_XeVlBYbWIpnb1CWq7QVKo88rZ72j28XDWNr2xK1Txn'
     CLERK_AUTHORIZED_PARTIES: Annotated[list[str], NoDecode] = []
     CLERK_WEBHOOK_SIGNING_SECRET: str | None = None
     CLERK_JWT_KEY: str | None = None

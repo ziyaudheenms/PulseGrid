@@ -19,11 +19,13 @@ def require_auth(
         AuthenticateRequestOptions(
             secret_key=settings.CLERK_SECRET_KEY,
             jwt_key=settings.CLERK_JWT_KEY,
-            authorized_parties=settings.CLERK_AUTHORIZED_PARTIES,
+            authorized_parties=["http://localhost:3000"],
             accepts_token=["session_token"],
         ),
     )
     if not state.is_signed_in:
+        print("unauthorized access to the gateway service")
+        print("state.reason.name:", state.reason.name if state.reason else "unauthorized")
         raise HTTPException(
             status_code=401,
             detail=state.reason.name if state.reason else "unauthorized",

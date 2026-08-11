@@ -29,10 +29,10 @@ export const createSource = createAsyncThunk<
       }
     )
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      return thunkAPI.rejectWithValue(errorData.message || "Request failed")
-    }
+    // if (!response.ok) {
+    //   const errorData = await response.json()
+    //   return thunkAPI.rejectWithValue(errorData.message || "Request failed")
+    // }
 
     return response.json()
   } catch (error: any) {
@@ -84,6 +84,14 @@ export const sourceSlice = createSlice({
             description: "Successfully populated the source to the data pipeline",
             type: "success"
 
+          })
+          state.createSources.data = [] // Clear the createSources data after successful submission
+        }
+        else if (response.status_code === 400 ) {
+          toast.add({
+            title: "Duplicate error",
+            description: "Duplicate source found in the data pipeline",
+            type: "error"
           })
         }
       })
