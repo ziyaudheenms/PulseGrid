@@ -1,14 +1,18 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi.exceptions import RequestValidationError
+
 import structlog
+from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+import redis.asyncio as redis_asyncio
+
 
 from core.database import connect_to_mongo, disconnect_from_mongo
 from core.logging import setup_logging
 from api.v1.admin import admin
+
 setup_logging()
 logger = structlog.get_logger()
 
@@ -16,13 +20,22 @@ logger = structlog.get_logger()
 async def lifespan(app: FastAPI):  #lifespan is used to do any setup or initialization tasks that need to be done before the application starts serving requests, and to do any cleanup or shutdown tasks that need to be done after the application stops serving requests
 
     await connect_to_mongo()
+    logger.info("trying to connect with redis")
+
+    app.state.redis = redis_asyncio.from_url(url=os.getenv("DATAPIPELINE_REDIS_TCP_URL") or '', password=os.getenv("DATAPIPELINE_REDIS_REST_TOKEN") or '')
+    logger.info("successfully connected with redis.......")
+
     yield
+
+    await app.state.redis.close()
+    logger.info("Detected that App has been closed, closing the initialized redis.........")
+
     await disconnect_from_mongo()
 
 
 app = FastAPI(title='PulseGrid',description="Your one-stop solution to stay updated in a fast-pacing world—giving you a clear picture of what's happening, every 8 hours",version="1.00",lifespan=lifespan) #initializes the FastAPI application with the lifespan context manager that connects to and disconnects from the MongoDB database asynchronously
 
-#this block i
+#this block is used to handle the validation erros 
 @app.exception_handler(RequestValidationError)
 async def custom_validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
