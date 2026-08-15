@@ -8,18 +8,20 @@ from pydantic import BaseModel, BeforeValidator, Field, HttpUrl, ConfigDict
 
 class SourceScope(str, Enum):
     TECHNICAL = 'Technical'
-    GAMING = 'Gaming'
+    SPORTS = 'Sports'
     CINEMA = 'Cinema'
 
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 #this will the validator shema for the input data for the source add endpoint
 class SourceSchema(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
     source_name: str = Field(...)
     source_type: str = Field(...) #can include 'International' or 'National'
     nationality: str | None = Field(None) #will be considered if the type is 'National'
     source_url: str
     source_scope: SourceScope
+    regex_pattern: str
     #why lambda? -> datetime.now(timezone.utc) takes an argument (timezone.utc), but default_factory requires a callable that takes zero arguments. Using lambda bridges this gap.
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  #timezone.utc is used so in order to get the geographical data along with the timestamp
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
