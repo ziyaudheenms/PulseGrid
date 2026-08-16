@@ -6,4 +6,3 @@ from pydantic import BaseModel
 class BrowserProfile(BaseModel):
     browser: str
     impersonate : str
-    headers : Dict[str, str] 

@@ -1,7 +1,11 @@
 import structlog
-from fastapi import APIRouter, Depends, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 import redis.asyncio as redis_asyncio
+from pymongo.asynchronous.database import AsyncDatabase
 
+
+from core.database import get_database
+from pulseBot.crawler import PulseBot
 from schema.source_schema import SourceIds, SourceResponceSchema, SourceSchema, SourceCollection
 from service.sourceService import SourceService
 from api.v1.deps import get_redis_client, get_source_service
@@ -63,4 +67,39 @@ async def get_source(
 
     return serialised_responce
 
+@router.get("/crawl", response_model=ApiResponseSchema[str])
+async def implement_crawler(
+    db: AsyncDatabase = Depends(get_database),
+    redis_client: redis_asyncio.Redis | None = Depends(get_redis_client)
+):
+    cached_sources = await redis_client.get(cache_key) if redis_client else None
     
+    if not cached_sources:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Cached resources not found......."
+        )
+
+    #Initiallzing our crawler bot for crawling
+    pulsebot = PulseBot(
+        db = db,
+        concurrency_limit=5,
+        max_retries=3,
+    )
+
+    parsed_sources = ApiResponseSchema[SourceCollection].model_validate_json(cached_sources)  #this converts the stringified responce into python objects -> we want to pass the parsed_source.sources (contains the list of SourceResponceSchema)
+    
+
+    crawl_responce = await pulsebot.fetch_urls(parsed_sources.data.sources)
+
+    if all(crawl_responce):
+        return ApiResponseSchema(
+            status_code=200,
+            message=f"Completed the crawl function",
+            data='successfully ran the crawler'
+        )
+    else:
+        raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"some sources are not crawlable....."
+        )

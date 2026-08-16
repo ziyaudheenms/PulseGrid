@@ -16,9 +16,11 @@ from curl_cffi.requests.errors import RequestsError
 from bs4 import BeautifulSoup
 from pymongo.asynchronous.database import AsyncDatabase
 
+from pulseBot.pulse_profiles import PROFILES
+
 from .schema import BrowserProfile
-from app.core.logging import setup_logging
-from schema.source_schema import SourceSchema
+from core.logging import setup_logging
+from schema.source_schema import SourceResponceSchema
 
 setup_logging()
 logger = structlog.get_logger()
@@ -27,18 +29,17 @@ class PulseBot:
     def __init__(
             self,
             db: AsyncDatabase,
-            profiles: List[BrowserProfile],
             concurrency_limit:int,
             max_retries:int = 3,
         ):
 
         self.db = db
-        self.profiles = profiles
+        self.profiles = PROFILES
         self.max_retries = max_retries
         self.semaphore = asyncio.Semaphore(concurrency_limit)  # semaphore is a asyncio method used in python that is used to control the no of asyncio connections that is been issued by the OS at a time.
 
-    async def pulse_crawl(self, session: AsyncSession,source:SourceSchema) -> bool:
-
+    async def pulse_crawl(self, session: AsyncSession,source:SourceResponceSchema) -> bool:
+        #session is used to persist the cokkies or other details of the request and the browser which helps to hit with same config in retries.
         async with self.semaphore:  #self.semaphore controls the simultaneous request opening by the given count
             #implementing the retry mechanism , if the fucntion doesnt gets its return it will loop again
             for attempt in range(self.max_retries):
@@ -46,14 +47,14 @@ class PulseBot:
 
                 try:
                     logger.info(f"trying to fetch-{source.source_url} attempt-{attempt}")
-                    response: Response = await session.get(url=source.source_url, impersonate=browser_profile.impersonate, headers=browser_profile.headers, timeout=30, allow_redirects=True)
+                    response: Response = await session.get(url=source.source_url, impersonate=browser_profile.impersonate,  timeout=30, allow_redirects=True)
 
                     if response.status_code == 200:
                         #we have successfully got the html content, now we need to parse it so that to get all the urls present in it and want to filter out the unwanted urls.\
                         logger.info(f"successfully fetched-{source.source_url} attempt-{attempt}")
                     
                         #encoding the regex pattern to identify the pattern matching
-                        pattern_str = source.regex_pattern
+                        pattern_str = source.crawl_pattern
                         # If the DB returned literal escaped backslashes '\\', unescape them:
                         if "\\\\" in pattern_str or "\\d" in pattern_str:
                             pattern_str = pattern_str.encode("utf-8").decode("unicode_escape")
@@ -87,8 +88,8 @@ class PulseBot:
                              "source_id" : source.id,
                              "no_of_urls":len(urls_to_be_inserted),  #the number of urls fetched
                              "article_urls": urls_to_be_inserted,
-                             "created_at" : datetime.datetime,  #date-time format to be used with mongo db 
-                             "updated_at" : datetime.datetime   #date-time format to be used with mongo db 
+                             "created_at" : datetime.datetime.now(datetime.timezone.utc),  #date-time format to be used with mongo db 
+                             "updated_at" : datetime.datetime.now(datetime.timezone.utc)   #date-time format to be used with mongo db 
                         }
 
                         result = await self.db["articleURLS"].insert_one(urls_database_object)
@@ -117,7 +118,7 @@ class PulseBot:
             logger.info(f"Unfortunate , pulseBot is unbale to crawl {source.source_url}, max retries exceeded the limits!")
             return False
 
-    async def fetch_urls(self, sources:list[SourceSchema]):
+    async def fetch_urls(self, sources:list[SourceResponceSchema]):
          """
             Using this function we have to implement the fetching of the given url objects.
          """
@@ -138,4 +139,4 @@ class PulseBot:
 
               logger.info(f"completed the crawling function here the results are" , result = results)
 
-         return True
+              return results
