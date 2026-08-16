@@ -4,6 +4,7 @@
 
 import asyncio
 from datetime import date
+import datetime
 import random
 import re
 from typing import List
@@ -21,18 +22,6 @@ from schema.source_schema import SourceSchema
 
 setup_logging()
 logger = structlog.get_logger()
-
-# async def main():
-#      async with AsyncSession(impersonate="chrome") as session:
-#         results = await asyncio.gather(*(session.get(url) for url in urls))   #asyncio.gather is the method that is used to run the functions asychronosly
-#         return [r.status_code for r in results]
-
-
-# print(asyncio.run(main()))
-
-
-
-
 
 class PulseBot:
     def __init__(
@@ -80,7 +69,7 @@ class PulseBot:
                         for a_tag in html_soup.find_all("a", href=True):
                             raw_href = a_tag["href"].strip()
                             
-                            full_url = urljoin('https://sports.ndtv.com/', raw_href)
+                            full_url = urljoin(source.source_url, raw_href)
                             
                             # 2. Clean tracking query parameters (e.g., ?utm_source=rss)
                             clean_url = urlparse(full_url)._replace(query="", fragment="").geturl()
@@ -98,11 +87,11 @@ class PulseBot:
                              "source_id" : source.id,
                              "no_of_urls":len(urls_to_be_inserted),  #the number of urls fetched
                              "article_urls": urls_to_be_inserted,
-                             "created_at" : date.today(),
-                             "updated_at" : date.today()
+                             "created_at" : datetime.datetime,  #date-time format to be used with mongo db 
+                             "updated_at" : datetime.datetime   #date-time format to be used with mongo db 
                         }
 
-                        result = await self.db["articleURLS"].insert_one(urls_to_be_inserted)
+                        result = await self.db["articleURLS"].insert_one(urls_database_object)
                         if result.acknowledged:
                              logger.info(f"added the article urls into DB of website url-{source.source_url} attempt-{attempt}")
                              return True
@@ -128,7 +117,25 @@ class PulseBot:
             logger.info(f"Unfortunate , pulseBot is unbale to crawl {source.source_url}, max retries exceeded the limits!")
             return False
 
-    async def fetch_urls(self):
-         pass
+    async def fetch_urls(self, sources:list[SourceSchema]):
+         """
+            Using this function we have to implement the fetching of the given url objects.
+         """
 
+         logger.info(f"starting with the pulseBot-Crawler to get all the URLS")
 
+         async with AsyncSession() as session:
+              #assiging and calling all the functions for each of the sources that exists
+              tasks = [
+                   self.pulse_crawl(session=session, source=source)
+                   for source in sources
+              ]
+
+              #next we have to call the tasks asychronously controlled by the semaphore concurrency rate
+              results = await asyncio.gather(
+                *tasks, return_exceptions=True   
+              )
+
+              logger.info(f"completed the crawling function here the results are" , result = results)
+
+         return True
