@@ -78,6 +78,7 @@ async def main():
             article.download(input_html=response.text)
             article.parse()
             print("article title:-", article.title)
+            print("images :- ", article.images)
 
             print("...........CONTENT BODY...........")
             body = trafilatura.extract(response.text)

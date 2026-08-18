@@ -101,7 +101,7 @@ class PulseBotCrawler:
                         result = await self.db["articleURLS"].insert_one(urls_database_object)
                         if result.acknowledged:
                              logger.info(f"added the article urls into DB of website url-{source.source_url} attempt-{attempt}")
-                             urls_database_object["id"] = result.inserted_id
+                            #  urls_database_object["id"] = result.inserted_id
 
                              #STORING THE RESULTS IN THE REDIS CACHE FOR EASY RETRIEVL
                              #storing in the redis by utilizing the redis LIST

@@ -43,11 +43,15 @@ class SourceResponceSchema(BaseModel):
         arbitrary_types_allowed=True,
         json_schema_extra={
             "example": {
+                        "_id": "507f1f77bcf86cd799439011",
                         "source_name": "TechCrunch",
                         "source_type": "International",
                         "nationality": "USA",
                         "source_url": "https://techcrunch.com",
-                        "source_scope": "TECHNICAL",
+                        "source_scope": "Technical",
+                        "crawl_pattern": "https://techcrunch.com/feed/",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "updated_at": "2024-01-15T10:30:00Z",
                 }
         }
     )
@@ -61,3 +65,28 @@ class SourceIds(BaseModel):
 #used to serialize the collection of sources returned by the source get endpoint
 class SourceCollection(BaseModel):
     sources: list[SourceResponceSchema]
+
+
+#used to serialize the collection of the crawled sources with the no of articles to be crawled and there counts.
+class CrawlObjectSchema(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    source_id: str
+    no_of_urls: int  #can include 'International' or 'National'
+    article_urls: list[str] #will contain the list of all the urls that are to be fetched for scrapping.
+    created_at: datetime | None = Field(None)
+    updated_at: datetime | None = Field(None)
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+        json_schema_extra={
+            "example": {
+                        "_id": "507f1f77bcf86cd799439012",
+                        "source_id": "507f1f77bcf86cd799439011",
+                        "no_of_urls": 5,
+                        "article_urls": ["https://techcrunch.com/article1", "https://techcrunch.com/article2"],
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "updated_at": "2024-01-15T10:30:00Z",
+                }
+        }
+    )
