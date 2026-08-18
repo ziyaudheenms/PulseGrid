@@ -1,6 +1,6 @@
 from pydantic import TypeAdapter
 from fastapi import HTTPException, status
-from pulseBot.crawler import PulseBot
+# from pulseBot.crawler import PulseBot
 from repository.sourceRepository import SourceRepository
 from schema.source_schema import SourceSchema
 

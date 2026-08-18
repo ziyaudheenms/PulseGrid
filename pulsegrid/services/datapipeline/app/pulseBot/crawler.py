@@ -9,12 +9,14 @@ import random
 import re
 from typing import List
 from urllib.parse import urlparse, urljoin
+import json
 
 import structlog
 from curl_cffi.requests import AsyncSession, Response
 from curl_cffi.requests.errors import RequestsError
 from bs4 import BeautifulSoup
 from pymongo.asynchronous.database import AsyncDatabase
+import redis.asyncio as redis_asyncio
 
 from pulseBot.pulse_profiles import PROFILES
 
@@ -25,10 +27,11 @@ from schema.source_schema import SourceResponceSchema
 setup_logging()
 logger = structlog.get_logger()
 
-class PulseBot:
+class PulseBotCrawler:
     def __init__(
             self,
             db: AsyncDatabase,
+            redis: redis_asyncio.Redis | None,
             concurrency_limit:int,
             max_retries:int = 3,
         ):
@@ -37,6 +40,9 @@ class PulseBot:
         self.profiles = PROFILES
         self.max_retries = max_retries
         self.semaphore = asyncio.Semaphore(concurrency_limit)  # semaphore is a asyncio method used in python that is used to control the no of asyncio connections that is been issued by the OS at a time.
+        self.redis = redis
+        self.cache_key = "pulsegrid:sources:crawl:all"  #this key in the redis is used to store all the results --> urls_database_object
+
 
     async def pulse_crawl(self, session: AsyncSession,source:SourceResponceSchema) -> bool:
         #session is used to persist the cokkies or other details of the request and the browser which helps to hit with same config in retries.
@@ -95,7 +101,22 @@ class PulseBot:
                         result = await self.db["articleURLS"].insert_one(urls_database_object)
                         if result.acknowledged:
                              logger.info(f"added the article urls into DB of website url-{source.source_url} attempt-{attempt}")
+                             urls_database_object["id"] = result.inserted_id
+
+                             #STORING THE RESULTS IN THE REDIS CACHE FOR EASY RETRIEVL
+                             #storing in the redis by utilizing the redis LIST
+                             # STORING THE RESULTS IN THE REDIS CACHE FOR EASY RETRIEVAL
+                             # Append the newly generated payload to the right side of the Redis list
+                             if self.redis is not None:
+                                    await self.redis.rpush(
+                                        self.cache_key,
+                                        json.dumps(urls_database_object, default=str),
+                                    )
+                                    logger.info(
+                                        f"appended crawl result to redis list key-{self.cache_key} for source-{source.source_url}"
+                                    )
                              return True
+                        
                         logger.info(f"failed to add the article urls into DB of website url-{source.source_url} attempt-{attempt}")
                         return False
 

@@ -5,7 +5,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 
 
 from core.database import get_database
-from pulseBot.crawler import PulseBot
+from pulseBot.crawler import PulseBotCrawler
 from schema.source_schema import SourceIds, SourceResponceSchema, SourceSchema, SourceCollection
 from service.sourceService import SourceService
 from api.v1.deps import get_redis_client, get_source_service
@@ -81,8 +81,9 @@ async def implement_crawler(
         )
 
     #Initiallzing our crawler bot for crawling
-    pulsebot = PulseBot(
+    pulsebot = PulseBotCrawler(
         db = db,
+        redis=redis_client,
         concurrency_limit=5,
         max_retries=3,
     )
