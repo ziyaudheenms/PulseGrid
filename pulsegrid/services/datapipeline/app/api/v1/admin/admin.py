@@ -117,15 +117,18 @@ async def implement_scrapper(
     db: AsyncDatabase = Depends(get_database),
     redis_client: redis_asyncio.Redis | None = Depends(get_redis_client)
 ):
-    cached_crawl_source = await redis_client.get(crawler_cache_key) if redis_client else None
+    cached_crawl_objects = await redis_client.lrange(crawler_cache_key, 0, -1) #this converts the stringified responce into python objects -> we want to pass the parsed_source.sources (contains the list of SourceResponceSchema)
+
     
-    if not cached_crawl_source:
+    if not cached_crawl_objects:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Cached resources not found......."
         )
 
-    #Initiallzing our crawler bot for crawling
+    cached_crawl_objects = cached_crawl_objects[1:] #the first element in the redis array is b'value' since we dont need that just eliminating the first element out 
+
+    # Initiallzing our crawler bot for crawling
     pulsebot = PulseBotScrapper(
         db = db,
         redis=redis_client,
@@ -133,9 +136,8 @@ async def implement_scrapper(
         max_retries=3,
     )
 
-    parsed_list_of_crawled_objects = await redis_client.lrange(crawler_cache_key, 0, -1) #this converts the stringified responce into python objects -> we want to pass the parsed_source.sources (contains the list of SourceResponceSchema)
     parsed_list_of_crawled_objects_adapter = TypeAdapter(list[CrawlObjectSchema]) #the adapter class to which we have to convert the list of bytes into
-    parsed_list_of_crawled_objects_adapter_python_formatted = parsed_list_of_crawled_objects_adapter.validate_python([json.loads(crawl_object_json) for crawl_object_json in parsed_list_of_crawled_objects])
+    parsed_list_of_crawled_objects_adapter_python_formatted = parsed_list_of_crawled_objects_adapter.validate_python([json.loads(crawl_object_json) for crawl_object_json in cached_crawl_objects])
 
     crawl_responce = await pulsebot.load_the_collection(crawlObjects=parsed_list_of_crawled_objects_adapter_python_formatted)
 
