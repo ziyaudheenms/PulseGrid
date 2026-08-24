@@ -12,7 +12,7 @@ from core.database import get_database
 from pulseBot.crawler import PulseBotCrawler
 from schema.source_schema import SourceIds, SourceResponceSchema, SourceSchema, SourceCollection, CrawlObjectSchema
 from service.sourceService import SourceService
-from api.v1.deps import get_redis_client, get_source_service
+from api.deps import get_redis_client, get_source_service
 from core.logging import setup_logging
 from schema.common import ApiResponseSchema
 
