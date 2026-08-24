@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     DATABASE_NAME: str  = MONGODB_NAME
     DATAPIPELINE_TASK_REDIS_TCP_URL: str = FETCH_PIPELINE_REDIS
 
+    #cach keys that are being user....
+    cache_key: str = "pulsegrid:sources:all"
+    crawler_cache_key: str = "pulsegrid:sources:crawl:all"
+
+
 
     model_config = SettingsConfigDict(
         # Read from a local environment file if variables are not in env
