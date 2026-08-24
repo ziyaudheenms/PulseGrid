@@ -35,6 +35,9 @@ class PulseBotScrapper:
 
     async def _process_single_url(self, session: AsyncSession, url: str, crawl_object: CrawlObjectSchema) -> bool:
         """Helper method to handle scraping and saving a single URL with retries."""
+        """
+        Semaphore is used to control the cuncorrent network request, like cuncorrent is to be used with http request or any form of network request
+        """
         async with self.semaphore:
             browser_profile = random.choice(self.profiles)
             

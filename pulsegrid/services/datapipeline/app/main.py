@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 import redis.asyncio as redis_asyncio
 
 
+from core.queue import close_queues, init_queues
 from core.database import connect_to_mongo, disconnect_from_mongo
 from core.logging import setup_logging
 from api.v1.admin import admin
@@ -25,10 +26,16 @@ async def lifespan(app: FastAPI):  #lifespan is used to do any setup or initiali
     app.state.redis = redis_asyncio.from_url(url=os.getenv("DATAPIPELINE_REDIS_TCP_URL") or '', password=os.getenv("DATAPIPELINE_REDIS_REST_TOKEN") or '')
     logger.info("successfully connected with redis.......")
 
+    logger.info("Trying to connect with the queues in the system")
+    init_queues()
+    logger.info("successfully intergrated the queue")
+
     yield
 
     await app.state.redis.close()
     logger.info("Detected that App has been closed, closing the initialized redis.........")
+    await close_queues()
+    logger.info("Detected that App has been closed, closing the initialized queues.........")
 
     await disconnect_from_mongo()
 

@@ -77,7 +77,7 @@ export const sourceSlice = createSlice({
       })
       .addCase(createSource.fulfilled, (state, action) => {
         state.createSources.isLoading = false
-        const response = action.payload
+        const response = action.payload as any
         if (response.status_code === 201) {
           toast.add({
             title: "Populated the Source ",

@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 load_dotenv()
 MONGODB_URL = os.getenv("MONGO_DB_URL", "")
 MONGODB_NAME = os.getenv("MONGO_DB_NAME", "")
+FETCH_PIPELINE_REDIS = os.getenv("DATAPIPELINE_TASK_REDIS_TCP_URL", "")
 
 class Settings(BaseSettings):
     APP_NAME: str = "PulseGrid"
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str | None = MONGODB_URL
     DATABASE_NAME: str  = MONGODB_NAME
+    DATAPIPELINE_TASK_REDIS_TCP_URL: str = FETCH_PIPELINE_REDIS
 
 
     model_config = SettingsConfigDict(
