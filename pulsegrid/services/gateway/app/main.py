@@ -48,7 +48,7 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
 # Register downstream routers
 app.include_router(datapipeline_router, prefix="/api/v1")
 
-@app.get("/health", tags=["Health"])
+@app.get("/health-check", tags=["Health"])
 async def health_check():
     return {"status": "healthy", "service": settings.PROJECT_NAME}
 
