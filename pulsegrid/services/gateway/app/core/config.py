@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from typing import Annotated
 
@@ -9,13 +10,10 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
 
     # Microservice Target URLs and Respected Versions
-    DATAPIPELINE_SERVICE_URL: str = "http://localhost:8000"
-    DATAPIPELINE_VERSION: str = "v1"
-
 
     #Authentication parameters for clerk based SDK
     # clerk_secret_key: str
-    CLERK_SECRET_KEY: str | None = 'sk_test_XeVlBYbWIpnb1CWq7QVKo88rZ72j28XDWNr2xK1Txn'
+    CLERK_SECRET_KEY: str | None = os.getenv('CLERK_SECRET_KEY')
     CLERK_AUTHORIZED_PARTIES: Annotated[list[str], NoDecode] = []
     CLERK_WEBHOOK_SIGNING_SECRET: str | None = None
     CLERK_JWT_KEY: str | None = None
