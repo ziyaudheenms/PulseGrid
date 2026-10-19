@@ -1,0 +1,65 @@
+
+services:
+
+  mongodb:
+    image: mongo:7.0
+    container_name: pulsegrid-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - pulsegrid-net
+
+  # 1. The Secure Python FastAPI Microservice
+  datapipeline-app:
+    build:
+      context: ../../                          # Steps up to root to access uv.lock
+      dockerfile: services/datapipeline/app/Dockerfile
+      args:
+        SERVICE_DIR: services/datapipeline  #passing the argument variableee
+    ports:
+      - "4001:80"
+    env_file:
+      - .env 
+    restart: unless-stopped
+    networks:
+      - pulsegrid-net
+
+
+  # 2. The Nginx Sidecar Proxy Shield
+  datapipeline-proxy:
+    build:
+      context: ./infra                   # Builds locally from the service's infra folder
+    restart: unless-stopped
+    # CRITICAL SECURITY PATTERN:
+    # Sharing the network namespace allows Nginx to talk directly to 
+    # the app via 127.0.0.1:8000 while hiding the app from the outside world.
+    network_mode: "service:datapipeline-app"  #this network mode is the key which binds the both into a single IP address thing, so that all the requests passess throught thr nginx first
+   
+
+  datapipeline-worker:
+    build:
+      context: ../../                        # Steps up to the monorepo root (matching your other services)
+      dockerfile: services/datapipeline/app/Dockerfile # Adjust path if your Dockerfile is placed inside app/
+      args:
+        SERVICE_DIR: services/datapipeline
+    container_name: pulsegrid-datapipeline-worker
+    restart: always
+    environment:
+      - PYTHONPATH=/app                        # Point to root /app since files are flattened
+    command: /app/.venv/bin/python -m workers.data_pipeline_worker
+    env_file:
+      - .env                                 # Looks for .env right inside services/datapipeline/
+    depends_on:
+      - mongodb
+    networks:
+      - pulsegrid-net
+
+volumes:
+  mongodb_data:
+
+networks:
+  pulsegrid-net:
+    driver: bridge

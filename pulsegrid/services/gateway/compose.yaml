@@ -1,0 +1,36 @@
+
+services:
+
+  mongodb:
+    image: mongo:7.0
+    container_name: pulsegrid-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - pulsegrid-net
+
+  gateway-app:
+    build:
+      context: ../../                          # Steps up to monorepo root to access uv.lock
+      dockerfile: services/gateway/app/Dockerfile
+      args:
+        SERVICE_DIR: services/gateway          # Passes the gateway folder path into the Dockerfile
+    ports:
+      - "3000:8000"                            # Maps host port 3000 to the container's internal port 8000
+    env_file:
+      - services/gateway/.env  # Connects to downstream services via internal DNS
+    restart: unless-stopped
+    networks:
+      - pulsegrid-net
+
+
+volumes:
+  mongodb_data:
+
+
+networks:
+  pulsegrid-net:
+    driver: bridge

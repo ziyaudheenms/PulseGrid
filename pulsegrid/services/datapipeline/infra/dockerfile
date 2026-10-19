@@ -1,0 +1,10 @@
+# Use official lightweight OpenResty image (Nginx + LuaJIT)
+FROM openresty/openresty:alpine
+
+# Remove default configuration file
+RUN rm -f /usr/local/openresty/nginx/conf/nginx.conf
+
+# Copy your custom secure proxy configuration into OpenResty's path
+COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
+
+EXPOSE 80

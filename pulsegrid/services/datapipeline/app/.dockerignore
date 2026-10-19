@@ -9,6 +9,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyd
 .Python
 build/
 develop-eggs/
@@ -50,6 +51,7 @@ coverage.xml
 
 # Environment and local configuration
 .env
+../env
 .env.*
 !.env.example
 

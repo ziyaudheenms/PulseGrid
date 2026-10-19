@@ -6,7 +6,7 @@ import structlog
 from pydantic import TypeAdapter    #Type Adapter is used to convert into pydantic modelss
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 import redis.asyncio as redis_asyncio
-from pymongo.asynchronous.database import AsyncDatabase
+# from pymongo.asynchronous.database import AsyncDatabase
 
 
 from core.queue import get_queue
