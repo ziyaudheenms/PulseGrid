@@ -19,7 +19,7 @@ def require_auth(
         AuthenticateRequestOptions(
             secret_key=settings.CLERK_SECRET_KEY,
             jwt_key=settings.CLERK_JWT_KEY,
-            authorized_parties=["http://localhost:3000"],
+            authorized_parties=["http://localhost:3001" , "http://127.0.0.1:3001"],
             accepts_token=["session_token"],
         ),
     )

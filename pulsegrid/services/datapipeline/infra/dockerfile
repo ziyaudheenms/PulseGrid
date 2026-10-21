@@ -1,6 +1,9 @@
 # Use official lightweight OpenResty image (Nginx + LuaJIT)
 FROM openresty/openresty:alpine
 
+# Install libsodium system library so Lua FFI can bind to it successfully
+RUN apk add --no-cache libsodium
+
 # Remove default configuration file
 RUN rm -f /usr/local/openresty/nginx/conf/nginx.conf
 
@@ -8,3 +11,6 @@ RUN rm -f /usr/local/openresty/nginx/conf/nginx.conf
 COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
 EXPOSE 80
+
+# Start OpenResty in the foreground
+CMD ["openresty", "-g", "daemon off;"]

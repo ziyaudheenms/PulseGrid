@@ -35,21 +35,25 @@ import {
   RefreshCw,
   Layers,
   ChevronDown,
+  FingerprintPatternIcon,
 } from "lucide-react"
+import { source_scope } from "@/types/source"
 
 function Page() {
   const [newSource, setNewSource] = useState<{
     source_name: string
     source_url: string
     source_type: string
-    source_nationality: string
-    source_scope: "Technical" | "Gaming" | "Cinema"
+    nationality: string
+    source_scope: source_scope
+    crawl_pattern: string
   }>({
     source_name: "",
     source_url: "",
     source_type: "",
-    source_nationality: "",
+    nationality: "",
     source_scope: "Technical",
+    crawl_pattern: ""
   })
 
   const { getToken } = useAuth()
@@ -70,8 +74,9 @@ function Page() {
       source_name: "",
       source_url: "",
       source_type: "",
-      source_nationality: "",
+      nationality: "",
       source_scope: "Technical",
+      crawl_pattern: ""
     })
   }
 
@@ -199,6 +204,26 @@ function Page() {
                   </InputGroup>
                 </Field>
 
+                <Field>
+                  <FieldLabel
+                    htmlFor="source_pattern"
+                    className="text-xs uppercase tracking-wider font-semibold text-muted-foreground"
+                  >
+                    Crawl Pattern
+                  </FieldLabel>
+                  <InputGroup>
+                    <InputGroupAddon align="inline-start">
+                      <FingerprintPatternIcon className="size-4 text-muted-foreground/75" />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      id="source_pattern"
+                      placeholder="add the source regex pattern"
+                      value={newSource.crawl_pattern}
+                      onChange={(e) => setNewSource({ ...newSource, crawl_pattern: e.target.value })}
+                    />
+                  </InputGroup>
+                </Field>
+
                 {/* Source Type & Nationality */}
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
@@ -235,9 +260,9 @@ function Page() {
                       <InputGroupInput
                         id="source_nationality"
                         placeholder="eg:- India or America or Japan"
-                        value={newSource.source_nationality}
+                        value={newSource.nationality}
                         onChange={(e) =>
-                          setNewSource({ ...newSource, source_nationality: e.target.value })
+                          setNewSource({ ...newSource, nationality: e.target.value })
                         }
                       />
                     </InputGroup>

@@ -1,18 +1,31 @@
 import httpx
 from fastapi import Request, HTTPException, Response, status
 
+from authentication.headerAuth import generate_libsodium_signature_headers
+
 
 #proxy_reuest is our function that performs a proxy request to the service and gets back the results
 # we can implement the api auditing here of the time taken to process the request, most requested microservice etc.
 
 async def proxy_request(url: str, request:Request, service: str) -> Response:
     body = await request.body()
+    libsodium_signature_credentials = generate_libsodium_signature_headers(method=request.method , path=url)
 
     #stripping away the host and content-length headers host-> URL of the gateway , content-length-> length of the body
-    headers = {
+    incoming_headers = {
         key: value for key, value in request.headers.items()
-        if key.lower() not in ("host", "content-length")  #let the request set the host and content-length headers fresh and new relative to the service
+        if key.lower() not in ("host", "content-length")
     }
+
+    sec_headers = generate_libsodium_signature_headers(method=request.method, path=url)
+
+    #Merge everything together: incoming client headers + content type + security headers
+    headers = {
+        **incoming_headers,
+        "Content-Type": "application/json",
+        **sec_headers
+    }
+
     print(headers)
     print(request)
     #we have to perform the async requesting

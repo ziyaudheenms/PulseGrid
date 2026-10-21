@@ -83,7 +83,7 @@ app.include_router(admin.router, prefix="/api/v1")
 
 @app.get('/health-check')
 def start():
-    logger.info("the server is running strong")
+    logger.info("The server is running strong: Datapipe Line")
 
 def main():
     print("Hello from bookmyvenue!")

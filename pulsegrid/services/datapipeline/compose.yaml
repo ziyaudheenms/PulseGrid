@@ -33,6 +33,8 @@ services:
     build:
       context: ./infra                   # Builds locally from the service's infra folder
     restart: unless-stopped
+    env_file:
+      - .env
     # CRITICAL SECURITY PATTERN:
     # Sharing the network namespace allows Nginx to talk directly to 
     # the app via 127.0.0.1:8000 while hiding the app from the outside world.
@@ -52,6 +54,9 @@ services:
     command: /app/.venv/bin/python -m workers.data_pipeline_worker
     env_file:
       - .env                                 # Looks for .env right inside services/datapipeline/
+    dns:
+      - 8.8.8.8   #---> google
+      - 1.1.1.1   #---> claudeflare
     depends_on:
       - mongodb
     networks:
