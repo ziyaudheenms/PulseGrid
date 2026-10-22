@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/input-group"
 
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook"
-import { createSource, updateCreateStore, removeTheCreateStoreSource } from "@/features/sourceSlice"
+import { createSource, updateCreateStore, removeTheCreateStoreSource, listTheSources } from "@/features/sourceSlice"
 import { useAuth, UserButton } from "@clerk/nextjs"
 import { Spinner } from "@/components/ui/spinner"
 import {
@@ -30,7 +30,7 @@ import {
   Upload,
   X,
   Code,
-  Gamepad2,
+  Trophy,
   Film,
   RefreshCw,
   Layers,
@@ -86,6 +86,12 @@ function Page() {
 
     dispatch(
       createSource({
+        token: clerkJwtToken || "",
+      })
+    )
+    // just added for the debugging phase.........
+    dispatch(
+      listTheSources({
         token: clerkJwtToken || "",
       })
     )
@@ -286,10 +292,10 @@ function Page() {
                           "border-blue-500 bg-blue-500/10 text-blue-500 dark:border-blue-400 dark:text-blue-400",
                       },
                       {
-                        id: "Gaming",
-                        label: "Gaming",
-                        icon: Gamepad2,
-                        desc: "Games & Esports",
+                        id: "Sports",
+                        label: "Sports",
+                        icon: Trophy,
+                        desc: "Sports & Athletics",
                         color: "hover:border-emerald-500/50 hover:bg-emerald-500/5",
                         activeColor:
                           "border-emerald-500 bg-emerald-500/10 text-emerald-500 dark:border-emerald-400 dark:text-emerald-400",
@@ -379,7 +385,7 @@ function Page() {
                     {createSources.data.map((source, index) => {
                       const scopeBadges = {
                         Technical: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-                        Gaming:
+                        Sports:
                           "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
                         Cinema:
                           "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
@@ -395,13 +401,13 @@ function Page() {
                               className={`size-10 rounded-lg flex items-center justify-center shrink-0 border ${
                                 source.source_scope === "Technical"
                                   ? "bg-blue-500/10 text-blue-500 border-blue-500/15"
-                                  : source.source_scope === "Gaming"
+                                  : source.source_scope === "Sports"
                                     ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/15"
                                     : "bg-purple-500/10 text-purple-500 border-purple-500/15"
                               }`}
                             >
                               {source.source_scope === "Technical" && <Code className="size-5 shrink-0" />}
-                              {source.source_scope === "Gaming" && <Gamepad2 className="size-5 shrink-0" />}
+                              {source.source_scope === "Sports" && <Trophy className="size-5 shrink-0" />}
                               {source.source_scope === "Cinema" && <Film className="size-5 shrink-0" />}
                             </div>
 
@@ -428,7 +434,7 @@ function Page() {
                                 <span className="text-muted-foreground/35">•</span>
                                 <span className="capitalize">{source.source_type}</span>
                                 <span className="text-muted-foreground/35">•</span>
-                                <span>{source.source_nationality}</span>
+                                <span>{source.nationality}</span>
                               </div>
                             </div>
                           </div>

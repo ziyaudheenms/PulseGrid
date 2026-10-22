@@ -40,6 +40,39 @@ export const createSource = createAsyncThunk<
   }
 })
 
+
+export const listTheSources = createAsyncThunk<
+  Source[],
+  { token: string }
+>("admin/viewSources", async ({ token }: createSourceArgs, thunkAPI) => {
+  // thunkAPI is used to access the state
+ 
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_GATEWAY_URL}/api/v1/datapipeline/admin/source`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    )
+
+    // if (!response.ok) {
+    //   const errorData = await response.json()
+    //   return thunkAPI.rejectWithValue(errorData.message || "Request failed")
+    // }
+    console.log(response)
+    return response.json()
+  } catch (error: any) {
+    return thunkAPI.rejectWithValue(error.message)
+  }
+})
+
+
+
+
 export const sourceSlice = createSlice({
   name: "source",
   initialState: {
@@ -49,6 +82,7 @@ export const sourceSlice = createSlice({
       data: [] as Source[],
       error: null,
     },
+    isLoading: false,
     sources: [] as Source[],
   },
   reducers: {
@@ -97,6 +131,31 @@ export const sourceSlice = createSlice({
       })
       .addCase(createSource.rejected, (state, action) => {
         state.createSources.isLoading = false
+      })
+      .addCase(listTheSources.pending, (state) => {
+        state.isLoading = true
+        state.sources = []  // making the sources emptyyyyy, so that to get all the fresh data
+      })
+      .addCase(listTheSources.fulfilled, (state, action) => {
+        state.isLoading = false
+        
+        const response = action.payload as any
+        if (response.status_code === 200) {
+          toast.add({
+            title: "Here The Sources",
+            description: "Successfully retrieved all the sources",
+            type: "success"
+
+          })
+          state.sources = response.data.data
+        }
+        else if (response.status_code === 400 ) {
+          toast.add({
+            title: "Duplicate error",
+            description: "Duplicate source found in the data pipeline",
+            type: "error"
+          })
+        }
       })
   },
 })

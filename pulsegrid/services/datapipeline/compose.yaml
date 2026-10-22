@@ -1,16 +1,16 @@
 
 services:
 
-  mongodb:
-    image: mongo:7.0
-    container_name: pulsegrid-mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - pulsegrid-net
+  # mongodb:
+  #   image: mongo:7.0
+  #   container_name: pulsegrid-mongodb
+  #   restart: unless-stopped
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - mongodb_data:/data/db
+  #   networks:
+  #     - pulsegrid-net
 
   # 1. The Secure Python FastAPI Microservice
   datapipeline-app:
@@ -57,13 +57,11 @@ services:
     dns:
       - 8.8.8.8   #---> google
       - 1.1.1.1   #---> claudeflare
-    depends_on:
-      - mongodb
     networks:
       - pulsegrid-net
 
-volumes:
-  mongodb_data:
+# volumes:
+#   mongodb_data:
 
 networks:
   pulsegrid-net:
