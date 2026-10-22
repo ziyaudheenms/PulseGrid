@@ -2,7 +2,7 @@
 FROM openresty/openresty:alpine
 
 # Install libsodium system library so Lua FFI can bind to it successfully
-RUN apk add --no-cache libsodium
+RUN apk add --no-cache libsodium libsodium-dev
 
 # Remove default configuration file
 RUN rm -f /usr/local/openresty/nginx/conf/nginx.conf

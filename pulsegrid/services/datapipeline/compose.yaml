@@ -67,4 +67,4 @@ volumes:
 
 networks:
   pulsegrid-net:
-    driver: bridge
+    external: true
