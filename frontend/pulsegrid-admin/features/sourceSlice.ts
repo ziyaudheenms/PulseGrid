@@ -140,14 +140,15 @@ export const sourceSlice = createSlice({
         state.isLoading = false
         
         const response = action.payload as any
+        
         if (response.status_code === 200) {
           toast.add({
             title: "Here The Sources",
-            description: "Successfully retrieved all the sources",
+            description: response.message,
             type: "success"
 
           })
-          state.sources = response.data.data
+          state.sources = response.data.sources  // actuall array of objects is stored in the sources of the data of responce --> responce.data.sources
         }
         else if (response.status_code === 400 ) {
           toast.add({

@@ -1,43 +1,81 @@
 "use client"
+
 import React, { useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { useAuth, UserButton } from "@clerk/nextjs"
+import Image from "next/image"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu"
-import { Field, FieldLabel, FieldDescription } from "@/components/ui/field"
+  Activity,
+  ArrowUpRight,
+  Check,
+  Code,
+  Film,
+  Fingerprint,
+  Globe,
+  Home,
+  Layers,
+  Link2,
+  Plus,
+  Radio,
+  RefreshCw,
+  Trophy,
+  Upload,
+  X,
+} from "lucide-react"
+
+import {
+  createSource,
+  listTheSources,
+  removeTheCreateStoreSource,
+  updateCreateStore,
+} from "@/features/sourceSlice"
+import { useAppDispatch, useAppSelector } from "@/lib/redux/hook"
+import { source_scope } from "@/types/source"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Field, FieldLabel } from "@/components/ui/field"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group"
-
-import { useAppDispatch, useAppSelector } from "@/lib/redux/hook"
-import { createSource, updateCreateStore, removeTheCreateStoreSource, listTheSources } from "@/features/sourceSlice"
-import { useAuth, UserButton } from "@clerk/nextjs"
 import { Spinner } from "@/components/ui/spinner"
-import {
-  Globe,
-  Link2,
-  Home,
-  Plus,
-  Upload,
-  X,
-  Code,
-  Trophy,
-  Film,
-  RefreshCw,
-  Layers,
-  ChevronDown,
-  FingerprintPatternIcon,
-} from "lucide-react"
-import { source_scope } from "@/types/source"
+
+const scopeOptions: {
+  id: source_scope
+  label: string
+  description: string
+  icon: typeof Code
+  activeClass: string
+  iconClass: string
+}[] = [
+  {
+    id: "Technical",
+    label: "Technical",
+    description: "Tech & development",
+    icon: Code,
+    activeClass:
+      "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    iconClass: "text-sky-600 dark:text-sky-400",
+  },
+  {
+    id: "Sports",
+    label: "Sports",
+    description: "Sports & athletics",
+    icon: Trophy,
+    activeClass:
+      "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    iconClass: "text-emerald-600 dark:text-emerald-400",
+  },
+  {
+    id: "Cinema",
+    label: "Cinema",
+    description: "Movies & media",
+    icon: Film,
+    activeClass:
+      "border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300",
+    iconClass: "text-fuchsia-600 dark:text-fuchsia-400",
+  },
+]
 
 function Page() {
   const [newSource, setNewSource] = useState<{
@@ -53,12 +91,16 @@ function Page() {
     source_type: "",
     nationality: "",
     source_scope: "Technical",
-    crawl_pattern: ""
+    crawl_pattern: "",
   })
 
   const { getToken } = useAuth()
   const { createSources } = useAppSelector((state) => state.source)
   const dispatch = useAppDispatch()
+  const stagedCount = createSources.data.length
+  const coverageCount = new Set(
+    createSources.data.map((source) => source.source_scope)
+  ).size
 
   const handleSourceAddition = (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,19 +111,17 @@ function Page() {
       })
     )
 
-    // Cleaning the input fields after upload function
     setNewSource({
       source_name: "",
       source_url: "",
       source_type: "",
       nationality: "",
       source_scope: "Technical",
-      crawl_pattern: ""
+      crawl_pattern: "",
     })
   }
 
-  const uploadTheSources = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const uploadTheSources = async () => {
     const clerkJwtToken = await getToken()
 
     dispatch(
@@ -89,7 +129,6 @@ function Page() {
         token: clerkJwtToken || "",
       })
     )
-    // just added for the debugging phase.........
     dispatch(
       listTheSources({
         token: clerkJwtToken || "",
@@ -102,386 +141,401 @@ function Page() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-b from-background to-muted/20 text-foreground pb-12">
-      {/* Admin Dashboard Control Bar */}
-      <header className="border-b border-border bg-card/60 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20">
-            <img src="/logo.png" alt="PulseGrid Logo" className="h-6 w-6 invert-0 dark:invert" />
-          </div>
-          <div>
+    <div className="min-h-screen bg-muted/30 text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border/80 bg-background backdrop-blur-xl">
+        <div className="mx-auto flex h-[68px] max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/20">
+              <Image
+                src="/logo.png"
+                alt="PulseGrid"
+                width={24}
+                height={24}
+                className="size-6 dark:invert"
+              />
+            </div>
             <div className="flex items-center gap-2">
-              <span className="font-heading font-bold text-lg tracking-tight">PulseGrid</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
-                Admin
+              <span className="font-heading text-base font-bold tracking-tight">
+                PulseGrid
+              </span>
+              <span className="hidden h-4 w-px bg-border sm:block" />
+              <span className="hidden text-sm text-muted-foreground sm:block">
+                Control room
               </span>
             </div>
-            <p className="text-[10px] text-muted-foreground -mt-0.5">Control Center</p>
           </div>
-        </div>
 
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-            <span>Infrastructure</span>
-            <span>/</span>
-            <span className="text-foreground">Ingestion Sources</span>
+          <div className="flex items-center gap-4">
+            <div className="hidden items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 sm:flex">
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500/50" />
+                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+              </span>
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                Ingestion active
+              </span>
+            </div>
+            <UserButton />
           </div>
-          <UserButton />
         </div>
       </header>
 
-      <main className="max-w-[1400px] mx-auto px-4 md:px-8 mt-8">
-        {/* Page Title Block */}
-        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-3xl font-bold tracking-tight">Ingestion Pipeline Configuration</h1>
-            <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
-              Register, validate, and manage ingestion feeds to fuel up the PulseGrid data pipeline.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4 bg-card border border-border rounded-xl p-3 shadow-xs">
-            <div className="h-10 w-10 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-              <RefreshCw className="size-5 animate-spin duration-3000" />
-            </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
-                Pipeline Status
-              </p>
-              <p className="text-xs font-bold text-emerald-500">Ingestion Active</p>
-            </div>
-          </div>
+      <main className="mx-auto max-w-[1440px] px-4 pt-8 pb-12 sm:px-6 sm:pt-10 lg:px-8">
+        <div className="mb-7 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <span>Infrastructure</span>
+          <span className="text-border">/</span>
+          <span className="text-foreground">Sources</span>
         </div>
 
-        {/* Dashboard Panels Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Form Configurator */}
-          <div className="lg:col-span-5 flex flex-col gap-6">
-            <div className="rounded-xl border border-border bg-card shadow-xs p-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-
-              <div className="mb-6">
-                <h2 className="font-heading text-xl font-semibold">Register Ingestion Source</h2>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Configure details for a new RSS feed or news website
-                </p>
-              </div>
-
-              <form onSubmit={handleSourceAddition} className="flex flex-col gap-5">
-                {/* Source Name */}
-                <Field>
-                  <FieldLabel
-                    htmlFor="source_name"
-                    className="text-xs uppercase tracking-wider font-semibold text-muted-foreground"
-                  >
-                    Source Name
-                  </FieldLabel>
-                  <InputGroup>
-                    <InputGroupAddon align="inline-start">
-                      <Globe className="size-4 text-muted-foreground/75" />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      id="source_name"
-                      placeholder="eg:- TechCrunch"
-                      value={newSource.source_name}
-                      onChange={(e) => setNewSource({ ...newSource, source_name: e.target.value })}
-                    />
-                  </InputGroup>
-                </Field>
-
-                {/* Source URL */}
-                <Field>
-                  <FieldLabel
-                    htmlFor="source_url"
-                    className="text-xs uppercase tracking-wider font-semibold text-muted-foreground"
-                  >
-                    Source URL
-                  </FieldLabel>
-                  <InputGroup>
-                    <InputGroupAddon align="inline-start">
-                      <Link2 className="size-4 text-muted-foreground/75" />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      id="source_url"
-                      placeholder="eg:- www.TechCrunch.com"
-                      value={newSource.source_url}
-                      onChange={(e) => setNewSource({ ...newSource, source_url: e.target.value })}
-                    />
-                  </InputGroup>
-                </Field>
-
-                <Field>
-                  <FieldLabel
-                    htmlFor="source_pattern"
-                    className="text-xs uppercase tracking-wider font-semibold text-muted-foreground"
-                  >
-                    Crawl Pattern
-                  </FieldLabel>
-                  <InputGroup>
-                    <InputGroupAddon align="inline-start">
-                      <FingerprintPatternIcon className="size-4 text-muted-foreground/75" />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      id="source_pattern"
-                      placeholder="add the source regex pattern"
-                      value={newSource.crawl_pattern}
-                      onChange={(e) => setNewSource({ ...newSource, crawl_pattern: e.target.value })}
-                    />
-                  </InputGroup>
-                </Field>
-
-                {/* Source Type & Nationality */}
-                <div className="grid grid-cols-2 gap-4">
-                  <Field>
-                    <FieldLabel
-                      htmlFor="source_type"
-                      className="text-xs uppercase tracking-wider font-semibold text-muted-foreground"
-                    >
-                      Type
-                    </FieldLabel>
-                    <InputGroup>
-                      <InputGroupAddon align="inline-start">
-                        <Globe className="size-4 text-muted-foreground/75" />
-                      </InputGroupAddon>
-                      <InputGroupInput
-                        id="source_type"
-                        placeholder="eg:- International or National"
-                        value={newSource.source_type}
-                        onChange={(e) => setNewSource({ ...newSource, source_type: e.target.value })}
-                      />
-                    </InputGroup>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel
-                      htmlFor="source_nationality"
-                      className="text-xs uppercase tracking-wider font-semibold text-muted-foreground"
-                    >
-                      Nationality
-                    </FieldLabel>
-                    <InputGroup>
-                      <InputGroupAddon align="inline-start">
-                        <Home className="size-4 text-muted-foreground/75" />
-                      </InputGroupAddon>
-                      <InputGroupInput
-                        id="source_nationality"
-                        placeholder="eg:- India or America or Japan"
-                        value={newSource.nationality}
-                        onChange={(e) =>
-                          setNewSource({ ...newSource, nationality: e.target.value })
-                        }
-                      />
-                    </InputGroup>
-                  </Field>
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)]">
+          <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border px-5 py-5 sm:px-6">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Plus className="size-5" />
                 </div>
-
-                {/* Source Scope Selection cards */}
-                <Field className="mt-2">
-                  <FieldLabel className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
-                    Source Scope
-                  </FieldLabel>
-                  <div className="grid grid-cols-3 gap-2 mt-1">
-                    {[
-                      {
-                        id: "Technical",
-                        label: "Technical",
-                        icon: Code,
-                        desc: "Tech & Dev",
-                        color: "hover:border-blue-500/50 hover:bg-blue-500/5",
-                        activeColor:
-                          "border-blue-500 bg-blue-500/10 text-blue-500 dark:border-blue-400 dark:text-blue-400",
-                      },
-                      {
-                        id: "Sports",
-                        label: "Sports",
-                        icon: Trophy,
-                        desc: "Sports & Athletics",
-                        color: "hover:border-emerald-500/50 hover:bg-emerald-500/5",
-                        activeColor:
-                          "border-emerald-500 bg-emerald-500/10 text-emerald-500 dark:border-emerald-400 dark:text-emerald-400",
-                      },
-                      {
-                        id: "Cinema",
-                        label: "Cinema",
-                        icon: Film,
-                        desc: "Movies & Media",
-                        color: "hover:border-purple-500/50 hover:bg-purple-500/5",
-                        activeColor:
-                          "border-purple-500 bg-purple-500/10 text-purple-500 dark:border-purple-400 dark:text-purple-400",
-                      },
-                    ].map((scopeOption) => {
-                      const Icon = scopeOption.icon
-                      const isSelected = newSource.source_scope === scopeOption.id
-                      return (
-                        <button
-                          key={scopeOption.id}
-                          type="button"
-                          onClick={() =>
-                            setNewSource({ ...newSource, source_scope: scopeOption.id as any })
-                          }
-                          className={`flex flex-col items-center justify-center p-3 rounded-lg border text-center transition-all duration-300 cursor-pointer ${
-                            isSelected
-                              ? scopeOption.activeColor + " shadow-xs font-semibold"
-                              : "border-border bg-card/40 text-muted-foreground " + scopeOption.color
-                          }`}
-                        >
-                          <Icon className="size-5 mb-1 shrink-0" />
-                          <span className="text-xs block font-medium">{scopeOption.label}</span>
-                          <span className="text-[9px] text-muted-foreground/80 mt-0.5 line-clamp-1">
-                            {scopeOption.desc}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </Field>
-
-                {/* Add to list button */}
-                <Button
-                  type="submit"
-                  className="w-full mt-4 flex items-center justify-center gap-2 py-5 bg-primary text-primary-foreground font-semibold rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 cursor-pointer text-sm"
-                >
-                  <Plus className="size-4" />
-                  Add Source To The List
-                </Button>
-              </form>
-            </div>
-          </div>
-
-          {/* Right Column: Ingestion Queue list & Actions */}
-          <div className="lg:col-span-7 flex flex-col gap-6">
-            <div className="rounded-xl border border-border bg-card shadow-xs p-6 flex flex-col min-h-[500px]">
-              <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h2 className="font-heading text-xl font-semibold">Staged Ingestion Queue</h2>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Sources waiting deployment to the ingestion nodes
+                  <h2 className="font-heading text-lg font-semibold tracking-tight">
+                    Add a source
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Enter the details for a feed or publication.
                   </p>
                 </div>
-                <div className="px-3 py-1 bg-muted text-muted-foreground text-xs font-semibold rounded-full border border-border">
-                  {createSources.data.length} {createSources.data.length === 1 ? "source" : "sources"} staged
+              </div>
+            </div>
+
+            <form
+              onSubmit={handleSourceAddition}
+              className="flex flex-col gap-5 p-5 sm:p-6"
+            >
+              <Field>
+                <FieldLabel
+                  htmlFor="source_name"
+                  className="text-sm font-medium"
+                >
+                  Source name
+                </FieldLabel>
+                <InputGroup className="h-10 bg-background">
+                  <InputGroupAddon align="inline-start">
+                    <Globe className="size-4" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    id="source_name"
+                    placeholder="e.g. TechCrunch"
+                    value={newSource.source_name}
+                    onChange={(e) =>
+                      setNewSource({
+                        ...newSource,
+                        source_name: e.target.value,
+                      })
+                    }
+                  />
+                </InputGroup>
+              </Field>
+
+              <Field>
+                <FieldLabel
+                  htmlFor="source_url"
+                  className="text-sm font-medium"
+                >
+                  Source URL
+                </FieldLabel>
+                <InputGroup className="h-10 bg-background">
+                  <InputGroupAddon align="inline-start">
+                    <Link2 className="size-4" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    id="source_url"
+                    placeholder="e.g. https://techcrunch.com"
+                    value={newSource.source_url}
+                    onChange={(e) =>
+                      setNewSource({ ...newSource, source_url: e.target.value })
+                    }
+                  />
+                </InputGroup>
+              </Field>
+
+              <Field>
+                <FieldLabel
+                  htmlFor="source_pattern"
+                  className="text-sm font-medium"
+                >
+                  Crawl pattern
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    · optional
+                  </span>
+                </FieldLabel>
+                <InputGroup className="h-10 bg-background">
+                  <InputGroupAddon align="inline-start">
+                    <Fingerprint className="size-4" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    id="source_pattern"
+                    placeholder="Add a source regex pattern"
+                    value={newSource.crawl_pattern}
+                    onChange={(e) =>
+                      setNewSource({
+                        ...newSource,
+                        crawl_pattern: e.target.value,
+                      })
+                    }
+                  />
+                </InputGroup>
+              </Field>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel
+                    htmlFor="source_type"
+                    className="text-sm font-medium"
+                  >
+                    Type
+                  </FieldLabel>
+                  <InputGroup className="h-10 bg-background">
+                    <InputGroupAddon align="inline-start">
+                      <Radio className="size-4" />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      id="source_type"
+                      placeholder="International or national"
+                      value={newSource.source_type}
+                      onChange={(e) =>
+                        setNewSource({
+                          ...newSource,
+                          source_type: e.target.value,
+                        })
+                      }
+                    />
+                  </InputGroup>
+                </Field>
+
+                <Field>
+                  <FieldLabel
+                    htmlFor="source_nationality"
+                    className="text-sm font-medium"
+                  >
+                    Nationality
+                  </FieldLabel>
+                  <InputGroup className="h-10 bg-background">
+                    <InputGroupAddon align="inline-start">
+                      <Home className="size-4" />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      id="source_nationality"
+                      placeholder="e.g. India"
+                      value={newSource.nationality}
+                      onChange={(e) =>
+                        setNewSource({
+                          ...newSource,
+                          nationality: e.target.value,
+                        })
+                      }
+                    />
+                  </InputGroup>
+                </Field>
+              </div>
+
+              <fieldset>
+                <legend className="mb-2 text-sm font-medium">
+                  Source scope
+                </legend>
+                <div className="grid grid-cols-3 gap-2">
+                  {scopeOptions.map((option) => {
+                    const Icon = option.icon
+                    const isSelected = newSource.source_scope === option.id
+
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() =>
+                          setNewSource({
+                            ...newSource,
+                            source_scope: option.id,
+                          })
+                        }
+                        className={`flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-xl border px-2 py-3 text-center transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none ${
+                          isSelected
+                            ? option.activeClass
+                            : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:bg-muted/60"
+                        }`}
+                      >
+                        <Icon
+                          className={`mb-1 size-5 ${isSelected ? "" : option.iconClass}`}
+                        />
+                        <span className="text-xs font-semibold">
+                          {option.label}
+                        </span>
+                        <span className="hidden text-[10px] text-muted-foreground sm:block">
+                          {option.description}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </fieldset>
+
+              <Button type="submit" className="mt-1 h-11 w-full gap-2">
+                <Plus className="size-4" />
+                Add to queue
+              </Button>
+            </form>
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="flex flex-col justify-between gap-4 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:px-6">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-secondary-foreground">
+                  <Layers className="size-5" />
+                </div>
+                <div>
+                  <h2 className="font-heading text-lg font-semibold tracking-tight">
+                    Deployment queue
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Review sources before sending them to the pipeline.
+                  </p>
                 </div>
               </div>
+              <Badge variant="secondary" className="w-fit gap-1.5 px-2.5 py-1">
+                <span className="size-1.5 rounded-full bg-primary" />
+                {stagedCount} {stagedCount === 1 ? "source" : "sources"} staged
+              </Badge>
+            </div>
 
-              {/* Queue List Area */}
-              <div className="flex-1 overflow-y-auto max-h-[360px] pr-2 no-scrollbar">
-                {createSources.data.length === 0 ? (
-                  /* Empty Queue State */
-                  <div className="h-full flex flex-col items-center justify-center border border-dashed border-border rounded-xl p-8 bg-muted/10 min-h-[300px]">
-                    <div className="h-16 w-16 rounded-full bg-muted/40 flex items-center justify-center mb-4">
-                      <Layers className="size-8 text-muted-foreground/60" />
-                    </div>
-                    <h3 className="font-heading text-sm font-semibold text-foreground/85">
-                      No sources staged
-                    </h3>
-                    <p className="text-xs text-muted-foreground text-center max-w-sm mt-1">
-                      Use the configurator form on the left to add ingestion details. Staged sources will show
-                      up here before pushing to production.
-                    </p>
+            <div className="p-5 sm:p-6">
+              {stagedCount === 0 ? (
+                <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
+                  <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-background text-muted-foreground shadow-sm">
+                    <Layers className="size-6" />
                   </div>
-                ) : (
-                  /* Staged queue list */
-                  <div className="flex flex-col gap-3">
-                    {createSources.data.map((source, index) => {
-                      const scopeBadges = {
-                        Technical: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-                        Sports:
-                          "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-                        Cinema:
-                          "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-                      }
-                      return (
-                        <div
-                          key={index}
-                          className="group flex items-center justify-between p-3.5 rounded-lg border border-border bg-card/60 hover:bg-card hover:border-border/80 hover:shadow-xs transition-all duration-300"
-                        >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            {/* Scope Icon badge */}
-                            <div
-                              className={`size-10 rounded-lg flex items-center justify-center shrink-0 border ${
-                                source.source_scope === "Technical"
-                                  ? "bg-blue-500/10 text-blue-500 border-blue-500/15"
-                                  : source.source_scope === "Sports"
-                                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/15"
-                                    : "bg-purple-500/10 text-purple-500 border-purple-500/15"
-                              }`}
-                            >
-                              {source.source_scope === "Technical" && <Code className="size-5 shrink-0" />}
-                              {source.source_scope === "Sports" && <Trophy className="size-5 shrink-0" />}
-                              {source.source_scope === "Cinema" && <Film className="size-5 shrink-0" />}
-                            </div>
+                  <h3 className="font-heading text-base font-semibold">
+                    Your queue is clear
+                  </h3>
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+                    Add a source with the form to the left. It will appear here
+                    for review before deployment.
+                  </p>
+                  <div className="mt-5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <Activity className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                    Ready for new sources
+                  </div>
+                </div>
+              ) : (
+                <div className="max-h-[460px] space-y-3 overflow-y-auto pr-1">
+                  {createSources.data.map((source, index) => {
+                    const scopeOption = scopeOptions.find(
+                      (option) => option.id === source.source_scope
+                    )
+                    const Icon = scopeOption?.icon ?? Globe
 
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-sm truncate">{source.source_name}</span>
-                                <span
-                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
-                                    scopeBadges[source.source_scope] || ""
-                                  }`}
-                                >
-                                  {source.source_scope}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-y-0.5 gap-x-3 text-xs text-muted-foreground mt-0.5">
-                                <a
-                                  href={source.source_url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="hover:text-primary hover:underline truncate max-w-[200px]"
-                                >
-                                  {source.source_url}
-                                </a>
-                                <span className="text-muted-foreground/35">•</span>
-                                <span className="capitalize">{source.source_type}</span>
-                                <span className="text-muted-foreground/35">•</span>
+                    return (
+                      <article
+                        key={`${source.source_name}-${index}`}
+                        className="group rounded-xl border border-border bg-background p-4 transition-colors hover:border-primary/20 hover:bg-muted/20"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`flex size-10 shrink-0 items-center justify-center rounded-xl border border-current/10 bg-muted/60 ${
+                              scopeOption?.iconClass ?? "text-muted-foreground"
+                            }`}
+                          >
+                            <Icon className="size-4.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="truncate text-sm font-semibold">
+                                {source.source_name || "Untitled source"}
+                              </h3>
+                              <Badge variant="outline" className="text-[10px]">
+                                {source.source_scope}
+                              </Badge>
+                            </div>
+                            <a
+                              href={source.source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1 inline-flex max-w-full items-center gap-1 truncate text-xs text-muted-foreground transition-colors hover:text-primary"
+                            >
+                              <span className="truncate">
+                                {source.source_url || "No URL provided"}
+                              </span>
+                              {source.source_url && (
+                                <ArrowUpRight className="size-3 shrink-0" />
+                              )}
+                            </a>
+                            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                              {source.source_type && (
+                                <span>{source.source_type}</span>
+                              )}
+                              {source.nationality && (
                                 <span>{source.nationality}</span>
-                              </div>
+                              )}
+                              {source.crawl_pattern && (
+                                <span className="max-w-full truncate font-mono text-[11px]">
+                                  Pattern: {source.crawl_pattern}
+                                </span>
+                              )}
                             </div>
                           </div>
-
-                          {/* Action: Delete from list */}
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Remove ${source.source_name || "source"} from queue`}
+                            title="Remove source"
                             onClick={() => handleRemoveSource(index)}
-                            className="size-8 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-all duration-300 ml-2 cursor-pointer"
-                            title="Remove Source"
+                            className="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                           >
                             <X className="size-4" />
-                          </button>
+                          </Button>
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
 
-              {/* Bottom deployment panel */}
-              {createSources.data.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="text-xs text-muted-foreground">
-                    Staging updates will be pushed in batch processing to live indexing nodes.
+              {stagedCount > 0 && (
+                <div className="mt-5 flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-2.5 text-xs leading-5 text-muted-foreground">
+                    <Check className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>
+                      Queue reviewed. Sources will be submitted together as one
+                      batch.
+                    </span>
                   </div>
                   <Button
+                    type="button"
                     onClick={uploadTheSources}
                     disabled={createSources.isLoading}
-                    className="sm:w-auto w-full flex items-center justify-center gap-2 py-5 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:-translate-y-0 cursor-pointer text-sm"
+                    className="h-11 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto"
                   >
                     {createSources.isLoading ? (
                       <>
                         <Spinner className="text-white" />
-                        Uploading...
+                        Uploading…
                       </>
                     ) : (
                       <>
                         <Upload className="size-4" />
-                        Upload The Source
+                        Deploy {stagedCount}{" "}
+                        {stagedCount === 1 ? "source" : "sources"}
                       </>
                     )}
                   </Button>
                 </div>
               )}
             </div>
-          </div>
+          </section>
+        </div>
+
+        <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <RefreshCw className="size-3.5" />
+          Sources are validated by the ingestion pipeline after deployment
         </div>
       </main>
     </div>
