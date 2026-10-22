@@ -13,6 +13,7 @@ import uuid
 import hashlib
 import base64
 from nacl.signing import SigningKey
+from urllib.parse import urlparse
 
 # 1. Your 32-byte Ed25519 private seed (Keep this secret in your Gateway .env!)
 # (You can generate a fresh one using the Python script we looked at earlier)
@@ -24,15 +25,19 @@ def generate_libsodium_signature_headers(method: str, path: str) -> dict:
     """
     timestamp = str(int(time.time()))
     nonce = str(uuid.uuid4())
+
+    parsed_url = urlparse(path)
+    parsed_path = parsed_url.path
     
     # Simple, human-readable canonical message format
-    message = f"{method.upper()}|{path}|{timestamp}|{nonce}".encode("utf-8")
+    message = f"{method.upper()}|{parsed_path}|{timestamp}|{nonce}".encode("utf-8")
     
     # Decode Base64 private key and sign the message
     seed_bytes = base64.b64decode(GATEWAY_PRIVATE_SEED_BS64)
     signing_key = SigningKey(seed_bytes)
     signed_message = signing_key.sign(message)
 
+    print("GATEWAY SIGNING MESSAGE:", message)
 
     return {
         "X-Signature": signed_message.signature.hex(),
