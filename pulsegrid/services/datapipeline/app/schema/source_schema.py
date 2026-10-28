@@ -107,6 +107,10 @@ class ArticleMetaData(BaseModel):
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  #timezone.utc is used so in order to get the geographical data along with the timestamp
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    status: str | None = Field(...) #used to track the current stage. 
+    """
+    status ---->   'pending' 'Embedded' 'classified' 'summarisez'  
+    """
 
     model_config = ConfigDict(
            populate_by_name=True,
@@ -118,6 +122,7 @@ class ArticleMetaData(BaseModel):
                            "title": "XYZ company raised a fund margin of 500Millions",
                            "body": "kjnfjnf skjfberhfuier sdkjflerfiuerfbkd vsjkdfbsdjfioa  vjsdfoawebfohesouv  ;sjdf;uesfhisnf;JHFSV JFBWEFHIUWN",
                            "url": "https://techcrunch.com/article1",
+                           "status" : "waiting for embedding",
                            "created_at": "2024-01-15T10:30:00Z",
                            "updated_at": "2024-01-15T10:30:00Z",
                    }
