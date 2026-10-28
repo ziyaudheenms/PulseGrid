@@ -27,6 +27,7 @@ dependencies = [
     "redis>=8.1.0",
     "semver>=3.0.4",
     "six>=1.17.0",
+    "spacy>=3.8.18",
     "structlog>=26.1.0",
     "trafilatura>=2.2.0",
 ]
