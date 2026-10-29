@@ -24,10 +24,8 @@ import spacy
 from functools import partial
 from sentence_transformers import SentenceTransformer
 import structlog
-import redis.asyncio as redis_asyncio
+# import redis.asyncio as redis_asyncio
 from pymongo.asynchronous.database import AsyncDatabase
-from sympy import true
-from transformers import NllbMoePreTrainedModel
 from schema.source_schema import ArticleMetaData
 from core.logging import setup_logging
 
@@ -40,7 +38,7 @@ class PulseCleanEmbedd():
     def __init__(
             self,
             db:AsyncDatabase,
-            redis: redis_asyncio.Redis | None,
+            # redis: redis_asyncio.Redis | None,
             concurrency_limit:int,
             max_retries:int = 3,
             transformer_model = ''
@@ -49,7 +47,7 @@ class PulseCleanEmbedd():
         self.db = db
         self.semaphore = asyncio.Semaphore(concurrency_limit)   #semaphore of asyncio is used to handle the no of concurrent request to shoot up from the OS
         self.retry = max_retries
-        self.redis = redis
+        # self.redis = redis
         self.transformer = SentenceTransformer(transformer_model)
         self.nlpAnalyzer = spacy.load('en_core_web_sm')  #this nlp model is used to extract the much wanted details from the article content that which we have to processs
         self.max_retries = max_retries
@@ -198,6 +196,7 @@ class PulseCleanEmbedd():
 
             raw_docs = await cursor.to_list(length=batch_size)
 
+            #no docs mean we have completed the scanning with all the available documents, and we can exsit from this loop game
             if not raw_docs:
                 logger.info("All articles batched and completed the process")
                 break
@@ -206,8 +205,16 @@ class PulseCleanEmbedd():
 
             #offloading this in to our batch execution engine
             batch_no = str(last_seen_id) if last_seen_id else 'initial batch'
+
+            logger.info("generated the batch and starting the batch embedd processing", batch_no = batch_no)
+            
             await self.execute_batch(articles=article_batch_list, batch_no=batch_no)
+            
             last_seen_id = raw_docs[-1]["_id"]  # assing the last id of the current batch so that the next iteration can direclty get into that id we required.
 
             await asyncio.sleep(0.05)
+
+        logger.info("successfully completed the embedd processing!!!!")
+
+        
     

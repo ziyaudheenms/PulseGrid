@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     #cach keys that are being user....
     cache_key: str = "pulsegrid:sources:all"
     crawler_cache_key: str = "pulsegrid:sources:crawl:all"
+    article_metadata_cache_key: str = 'pulsegrid:sources:article_meta_data:all'
 
 
 

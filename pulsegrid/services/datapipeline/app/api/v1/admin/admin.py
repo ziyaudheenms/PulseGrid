@@ -102,3 +102,16 @@ async def implement_scrapper():
         message="Scrapper task successfully enqueued.",
         data=f"Job ID: {job.id}"
     )
+
+@router.get("/embedd", response_model=ApiResponseSchema[str])
+async def implement_embedding():
+
+    # Offload task to BullMQ queue
+    queue = get_queue('data_pipeline')
+    job = await queue.add("implement_embedding", {})
+
+    return ApiResponseSchema(
+        status_code=200,
+        message="Embedding task successfully enqueued.",
+        data=f"Job ID: {job.id}"
+    )
