@@ -19,12 +19,14 @@
 
 import asyncio
 import random
+from typing import Any
 import spacy
 from functools import partial
 from sentence_transformers import SentenceTransformer
 import structlog
 import redis.asyncio as redis_asyncio
 from pymongo.asynchronous.database import AsyncDatabase
+from sympy import true
 from transformers import NllbMoePreTrainedModel
 from schema.source_schema import ArticleMetaData
 from core.logging import setup_logging
@@ -79,7 +81,7 @@ class PulseCleanEmbedd():
         return clean_title
 
 
-    async def embeddContent(self, article: ArticleMetaData):
+    async def embedd_content(self, article: ArticleMetaData):
         """
         this method of embeddd class  is used to handle the embedding of the content, 
         as of the architecture we are planning of merging the title + description into a content and implemnentng the embedding
@@ -149,20 +151,63 @@ class PulseCleanEmbedd():
                 logger.error("Database update failed for this article", url=article.url, crawl_id=article.crawl_object_id, id= article.id)
                 return   
 
-    async def execute_batch(self, articles: list[ArticleMetaData], batch_no):
+    
+    async def execute_batch(self, articles: list[ArticleMetaData], batch_no:str):
         """Class method: Takes a pre-fetched list of articles and runs them
         concurrently using self.embeddContent and internal semaphore controls.
         """
         if not articles:
             return []
 
-        tasks = [self.embeddContent(article) for article in articles]
+        tasks = [self.embedd_content(article) for article in articles]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         logger.info("Completed the embedding of the current batch", result=results, batch = batch_no)
         return results
 
-                
+    
+    async def fetch_article_batch(self, batch_size:int):
+        """
+            Through this function we are fetching the artciles from the database
+            using the cursor based one , where we directlty point to the cursor for which we have to start
+            picking up the batch.
+        """
+
+        last_seen_id = None
+
+        while True:
+
+            #assigining the pydantic verification for like saying that the query dict can have string as the key and type 'Any'
+            query : dict[str, Any] = {
+                "$or": [
+                    {"status": {"$exists": False}},
+                    {"status": {"$ne": "Embedded"}}
+                ]
+            }
+
+            if last_seen_id:
+                query["_id"] = {"$gt": last_seen_id}
 
 
+            cursor = (
+                self.collection.find(query)
+                .sort("_id", 1)
+                .limit(batch_size)
+            )
+
+            raw_docs = await cursor.to_list(length=batch_size)
+
+            if not raw_docs:
+                logger.info("All articles batched and completed the process")
+                break
+
+            article_batch_list : list[ArticleMetaData] = [ArticleMetaData.model_validate(article) for article in raw_docs]  #converted the list of articles into pydantic list of article models
+
+            #offloading this in to our batch execution engine
+            batch_no = str(last_seen_id) if last_seen_id else 'initial batch'
+            await self.execute_batch(articles=article_batch_list, batch_no=batch_no)
+            last_seen_id = raw_docs[-1]["_id"]  # assing the last id of the current batch so that the next iteration can direclty get into that id we required.
+
+            await asyncio.sleep(0.05)
+    
