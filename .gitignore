@@ -45,3 +45,11 @@ pnpm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+
+# Python cache and bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
