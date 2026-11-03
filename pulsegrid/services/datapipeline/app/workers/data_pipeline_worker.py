@@ -15,7 +15,7 @@ the DB redis that is initialissed in the fastapi instance
 
 
 from core.database import connect_to_mongo, disconnect_from_mongo
-from tasks.data_fetch import route_data_fetch_task
+from tasks.task_router import route_fetch_task
 from core.config import settings
 # from core.logging import setup_logging
 
@@ -153,7 +153,7 @@ async def start_worker():
 
     worker = Worker(
         WORKER_NAME,
-        route_data_fetch_task, # type: ignore[arg-type]
+        route_fetch_task, # type: ignore[arg-type]
         {"connection": settings.DATAPIPELINE_TASK_REDIS_TCP_URL, "concurrency": CONCURRENCY}
     )
 

@@ -39,6 +39,7 @@ from api.deps import get_redis_client
 from core.database import get_database
 from core.config import settings
 from core.logging import setup_logging
+from repository.sourceRepository import SourceRepository
 
 setup_logging()
 logger = structlog.get_logger()
@@ -52,8 +53,21 @@ async def implement_crawler_handler(job:Job):
         cached_sources = await redis_client.get(settings.cache_key) if redis_client else None
         
         if not cached_sources:
-            logger.error("The sources have not being cached......")
-            return
+            source_repository = SourceRepository(db)
+            sources = await source_repository.get_all_sources()
+
+            if not sources:
+                logger.error("No sources found in the cache or database")
+                return
+
+            sources_response = ApiResponseSchema[SourceCollection](
+                status_code=200,
+                message="Successfully retrieved all sources",
+                data=SourceCollection(sources=sources),
+            )
+            await redis_client.set(settings.cache_key, sources_response.model_dump_json())
+            cached_sources = sources_response.model_dump_json()
+            logger.info("Retrieved and cached sources from the database")
         
         #Initiallzing our crawler bot for crawling
         pulsebot = PulseBotCrawler(

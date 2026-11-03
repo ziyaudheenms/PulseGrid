@@ -107,7 +107,7 @@ class ArticleMetaData(BaseModel):
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  #timezone.utc is used so in order to get the geographical data along with the timestamp
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    status: str | None = Field(...) #used to track the current stage. 
+    status: str | None = Field(default=None, description="Used to track the current stage.")
     """
     status ---->   'pending' 'Embedded' 'classified' 'summarisez'  
     """

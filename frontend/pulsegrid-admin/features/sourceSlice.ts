@@ -72,6 +72,36 @@ export const listTheSources = createAsyncThunk<
 
 
 
+export const triggerEmbedding = createAsyncThunk<
+  Source[],
+  { token: string }
+>("admin/embedd", async ({ token }: createSourceArgs, thunkAPI) => {
+  // thunkAPI is used to access the state
+ 
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_GATEWAY_URL}/api/v1/datapipeline/admin/embedd`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    )
+
+    // if (!response.ok) {
+    //   const errorData = await response.json()
+    //   return thunkAPI.rejectWithValue(errorData.message || "Request failed")
+    // }
+    console.log(response)
+    return response.json()
+  } catch (error: any) {
+    return thunkAPI.rejectWithValue(error.message)
+  }
+})
+
+
 
 export const sourceSlice = createSlice({
   name: "source",

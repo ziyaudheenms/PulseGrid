@@ -19,7 +19,7 @@ COPY uv.lock ./
 COPY services/datapipeline/pyproject.toml ./pyproject.toml
 
 # 3. Install dependencies using the root lockfile and service config
-RUN uv sync --frozen --no-install-project --no-dev --refresh
+RUN uv sync --frozen --no-install-project --no-dev 
 
 # Install bullmq using uv's pip wrapper into the virtual environment
 RUN uv pip install --python /app/.venv/bin/python bullmq

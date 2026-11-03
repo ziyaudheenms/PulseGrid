@@ -26,6 +26,7 @@ import {
   createSource,
   listTheSources,
   removeTheCreateStoreSource,
+  triggerEmbedding,
   updateCreateStore,
 } from "@/features/sourceSlice"
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hook"
@@ -124,16 +125,22 @@ function Page() {
   const uploadTheSources = async () => {
     const clerkJwtToken = await getToken()
 
+    // dispatch(
+    //   createSource({
+    //     token: clerkJwtToken || "",
+    //   })
+    // )
     dispatch(
-      createSource({
+      triggerEmbedding({
         token: clerkJwtToken || "",
       })
     )
-    dispatch(
-      listTheSources({
-        token: clerkJwtToken || "",
-      })
-    )
+    // alert("Sources have been submitted for ingestion. You can check the ingestion status in the Ingestion tab.")
+    // // dispatch(
+    // //   listTheSources({
+    // //     token: clerkJwtToken || "",
+    // //   })
+    // // )
   }
 
   const handleRemoveSource = (index: number) => {

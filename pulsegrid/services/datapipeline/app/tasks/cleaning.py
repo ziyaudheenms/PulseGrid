@@ -12,7 +12,7 @@ setup_logging()
 logger = structlog.get_logger()
 
 async def implement_embedding_handler(job:Job):
-
+    logger.info(f"Got a task, looking for the function suitable to execute this. Job name: {job.name}")
     db = await get_database()
 
     try:
@@ -27,8 +27,9 @@ async def implement_embedding_handler(job:Job):
 
         #all the required batching , processing asyn, controlling the simultaneous async threads all are controlled by the PulseCleanClass itself
         #we just have to initiate push for the batching process
-
+        logger.info("Starting the embedding process for the articles in the database")
         await pulseclean.fetch_article_batch(batch_size=50)
     finally:
         #once all the process completed either successfull or failure cleanig up the openened connections
-        await db.client.close()
+        # await db.client.close()
+        pass

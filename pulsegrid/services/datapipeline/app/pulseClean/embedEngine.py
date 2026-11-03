@@ -28,6 +28,8 @@ import structlog
 from pymongo.asynchronous.database import AsyncDatabase
 from schema.source_schema import ArticleMetaData
 from core.logging import setup_logging
+from bson import ObjectId
+
 
 setup_logging()
 logger = structlog.get_logger()
@@ -89,6 +91,11 @@ class PulseCleanEmbedd():
             """
             controlling the operation of the embedding function asynchronoulsy using the semaphore boundary limits
             """
+
+            if article.embedding is not None:
+                logger.info("The embedding is already generated for this article, skipping the embedding process", url=article.url, crawl_id=article.crawl_object_id, id= article.id)
+                return
+            
             formatted_content = self.extract_semantic_heart(title=article.title, description=article.body)
             
             #the embedding process is of sync nature so we have to run this in a saperate loop
@@ -125,11 +132,23 @@ class PulseCleanEmbedd():
                 logger.error("Cant find the vector embedding of this document", url=article.url, crawl_id=article.crawl_object_id, id= article.id)
                 return
 
-             
+
+
+            try:
+                query_id = ObjectId(str(article.id)) if article.id else None
+            except Exception as e:
+                logger.error("Invalid ObjectId format", id=article.id, error=str(e))
+                return
+
+            if not query_id:
+                logger.error("Missing article ID", url=article.url)
+                return
+
+
             try:
                 updated_article_record = await self.collection.update_one(
                     {
-                        "_id": article.id
+                        "_id": query_id
                     },
                     {
                         "$set" : {
