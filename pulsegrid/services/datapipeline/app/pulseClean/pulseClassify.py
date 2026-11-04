@@ -12,14 +12,20 @@ using the scipy we use the graph method and finds out all the related nodes or a
 
 
 """
-import asyncio
 from datetime import datetime, timezone
 import numpy as np
+import structlog
 
 from pymongo.asynchronous.database import AsyncDatabase
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 from bson import ObjectId
+from core.logging import setup_logging
+
+setup_logging()
+logger = structlog.get_logger()
+
+
 class PulseClassify:
     def __init__(
         self, 
@@ -37,6 +43,7 @@ class PulseClassify:
 
         cluster_grps = []
         articles_ids_to_update = []
+        logger.info("Saving article classification clusters", category=category, cluster_count=len(clusters_map))
 
         for cluster_id, article_ids in clusters_map.items():
 
@@ -47,6 +54,8 @@ class PulseClassify:
                     object_id_refs.append(aid)
                 elif isinstance(aid, str) and ObjectId.is_valid(aid):
                     object_id_refs.append(ObjectId(aid))
+                else:
+                    logger.error("Invalid article ObjectId in classification cluster", category=category, cluster_id=cluster_id, article_id=aid)
 
             cluster_grps.append({
                 "cluster_id": cluster_id,
@@ -60,13 +69,32 @@ class PulseClassify:
             articles_ids_to_update.extend(object_id_refs)
 
         if cluster_grps:
-            await self.collection.insert_many(cluster_grps)
+            try:
+                result = await self.collection.insert_many(cluster_grps)
+                logger.info(
+                    "Inserted article classification clusters",
+                    category=category,
+                    inserted_count=len(result.inserted_ids),
+                )
+            except Exception as exc:
+                logger.error("Failed to insert article classification clusters", category=category, error=str(exc), exc_info=True)
+                return
 
         if articles_ids_to_update:
-            await self.collection.update_many(
-                {"_id": {"$in": articles_ids_to_update}},
-                {"$set": {"status": "Classified"}}
-            )
+            try:
+                result = await self.collection.update_many(
+                    {"_id": {"$in": articles_ids_to_update}},
+                    {"$set": {"status": "Classified"}}
+                )
+                logger.info(
+                    "Updated classified article status",
+                    category=category,
+                    matched_count=result.matched_count,
+                    modified_count=result.modified_count,
+                )
+            except Exception as exc:
+                logger.error("Failed to update classified article status", category=category, error=str(exc), exc_info=True)
+                return
 
 
     async def classify_articles(self, embeddings: list, article_ids: list):
@@ -74,9 +102,24 @@ class PulseClassify:
             Now we have the embeddings and the article ids as of in correct order, what we need is just to perform the futher ops,
             error handling of if the embeddings are empty or the article ids are empty will be handled outside 
         """
+        if not embeddings or not article_ids:
+            logger.error("Cannot classify articles with empty embeddings or article IDs", embedding_count=len(embeddings), article_id_count=len(article_ids))
+            return
+
+        if len(embeddings) != len(article_ids):
+            logger.error(
+                "Embedding and article ID counts do not match",
+                embedding_count=len(embeddings),
+                article_id_count=len(article_ids),
+            )
+            return
 
         #convert all this embeddings to numpy array for the further operations
-        embeddings_array = np.array(embeddings, dtype=np.float32)
+        try:
+            embeddings_array = np.array(embeddings, dtype=np.float32)
+        except (TypeError, ValueError) as exc:
+            logger.error("Failed to convert article embeddings to NumPy array", error=str(exc), exc_info=True)
+            return
 
         #now we have to perform the calculate the simularity globally for all the articles simultnaeously, for that we will use the dot product of the embeddings with its transpose to get the cosine similarity matrix
 
@@ -103,6 +146,11 @@ class PulseClassify:
             clusters_map[cluster_id].append(article_ids[idx])
 
         #once we have the clustor map next comes of integrating it with our database so that to have a meaning.
+        logger.info(
+            "Article clustering completed",
+            article_count=len(article_ids),
+            cluster_count=len(clusters_map),
+        )
         return clusters_map
 
 
@@ -112,23 +160,37 @@ class PulseClassify:
         """
         #as of for this operation we just need the article ids and the embedding which we will use for further references.
         
-        cursor = self.collection.find(
-            {
-                "category": category,
-                "status" : {"$ne": "Classified"}  # Exclude already classified articles
-            },
-            {
-            "_id": 1,        # MongoDB ObjectId reference
-            "embedding": 1   # 1536-dim vector for linear algebra
-            }
-        )
+        logger.info("Fetching article embeddings for classification", category=category)
+        try:
+            cursor = self.collection.find(
+                {
+                    "category": category,
+                    "status" : {"$ne": "Classified"}  # Exclude already classified articles
+                },
+                {
+                "_id": 1,        # MongoDB ObjectId reference
+                "embedding": 1   # 1536-dim vector for linear algebra
+                }
+            )
+        except Exception as exc:
+            logger.error("Failed to query article embeddings", category=category, error=str(exc), exc_info=True)
+            return
 
         embeddings = []
         article_ids = []
         #since async is written each document will be fetched one by one and we will append the embedding and the article id to the list of embeddings and article_ids  so that to save the memmory usage
-        async for document in cursor:
-            if "embedding" in document:
-                embeddings.append(document["embedding"])
-                article_ids.append(document["_id"])
+        try:
+            async for document in cursor:
+                if "embedding" in document:
+                    embeddings.append(document["embedding"])
+                    article_ids.append(document["_id"])
+        except Exception as exc:
+            logger.error("Failed while reading article embeddings", category=category, error=str(exc), exc_info=True)
+            return
         
+        logger.info(
+            "Fetched article embeddings for classification",
+            category=category,
+            article_count=len(article_ids),
+        )
         return embeddings, article_ids

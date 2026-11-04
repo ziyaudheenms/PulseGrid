@@ -33,3 +33,7 @@ async def implement_embedding_handler(job:Job):
         #once all the process completed either successfull or failure cleanig up the openened connections
         # await db.client.close()
         pass
+
+
+async def implement_classification_handler(job:Job):
+    pass
