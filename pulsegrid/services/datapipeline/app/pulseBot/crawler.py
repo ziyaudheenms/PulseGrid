@@ -12,6 +12,7 @@ from urllib.parse import urlparse, urljoin
 import json
 
 import structlog
+from bson import ObjectId
 from curl_cffi.requests import AsyncSession, Response
 from curl_cffi.requests.errors import RequestsError
 from bs4 import BeautifulSoup
@@ -91,7 +92,8 @@ class PulseBotCrawler:
 
                         #object to be added into the database
                         urls_database_object = {
-                             "source_id" : source.id,
+                             "source_id" : ObjectId(str(source.id)) if isinstance(source.id, ObjectId) is False else source.id,
+                             "category": source.source_scope.value,
                              "no_of_urls":len(urls_to_be_inserted),  #the number of urls fetched
                              "article_urls": urls_to_be_inserted,
                              "created_at" : datetime.datetime.now(datetime.timezone.utc),  #date-time format to be used with mongo db 

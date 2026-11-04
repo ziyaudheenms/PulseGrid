@@ -6,6 +6,7 @@ import random
 import structlog
 import trafilatura
 import redis.asyncio as redis_asyncio
+from bson import ObjectId
 from newspaper import Article
 from curl_cffi.requests import AsyncSession, Response
 from curl_cffi.requests.errors import RequestsError
@@ -62,7 +63,8 @@ class PulseBotScrapper:
                         body_of_the_article = trafilatura.extract(response.text)
 
                         article_metadata = {
-                            "crawl_object_id": crawl_object.id,
+                            "crawl_object_id": ObjectId(str(crawl_object.id)) if isinstance(crawl_object.id, ObjectId) is False else crawl_object.id,
+                            "category": crawl_object.category,
                             "title": title_of_the_article,  
                             "body": body_of_the_article,
                             "url" : url,

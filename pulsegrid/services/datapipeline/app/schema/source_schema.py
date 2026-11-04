@@ -72,6 +72,7 @@ class SourceCollection(BaseModel):
 class CrawlObjectSchema(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     source_id: str
+    category: SourceScope
     no_of_urls: int  #can include 'International' or 'National'
     article_urls: list[str] #will contain the list of all the urls that are to be fetched for scrapping.
     created_at: datetime | None = Field(None)
@@ -84,6 +85,7 @@ class CrawlObjectSchema(BaseModel):
             "example": {
                         "_id": "507f1f77bcf86cd799439012",
                         "source_id": "507f1f77bcf86cd799439011",
+                        "category": "Technical",
                         "no_of_urls": 5,
                         "article_urls": ["https://techcrunch.com/article1", "https://techcrunch.com/article2"],
                         "created_at": "2024-01-15T10:30:00Z",
@@ -99,6 +101,7 @@ class CrawlObjectSchema(BaseModel):
 class ArticleMetaData(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     crawl_object_id: Optional[PyObjectId] = Field(alias="crawl_object_id", default=None)  #the forieng key reference for the url from which this article content has been generated.
+    category: SourceScope
     title:  str = Field(...)
     body: str = Field(...)
     url :  str = Field(...)
@@ -119,6 +122,7 @@ class ArticleMetaData(BaseModel):
                "example": {
                            "_id": "507f1f77bcf86cd799439012",
                            "crawl_object_id": "507f1f77bcf86cd799439011",
+                           "category": "Technical",
                            "title": "XYZ company raised a fund margin of 500Millions",
                            "body": "kjnfjnf skjfberhfuier sdkjflerfiuerfbkd vsjkdfbsdjfioa  vjsdfoawebfohesouv  ;sjdf;uesfhisnf;JHFSV JFBWEFHIUWN",
                            "url": "https://techcrunch.com/article1",
@@ -128,4 +132,3 @@ class ArticleMetaData(BaseModel):
                    }
            }
        )
-
