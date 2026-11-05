@@ -33,7 +33,8 @@ class PulseClassify:
         threshold: float
     ):
         self.db = db
-        self.collection = self.db["articleMetaData"]
+        self.Groupcollection = self.db["articleCollection"]
+        self.articleCollection = self.db["articleMetaData"]
         self.similarity_threshold = threshold  # Define a threshold for cosine similarity to consider articles as similar
 
 
@@ -59,7 +60,7 @@ class PulseClassify:
                     logger.error("Invalid article ObjectId in classification cluster", category=category, cluster_id=cluster_id, article_id=aid)
 
             cluster_grps.append({
-                "cluster_id": cluster_id,
+                "cluster_id": int(cluster_id),  # <-- Explicitly cast to native Python int
                 "category": category,
                 "article_no": len(object_id_refs),
                 "article_ids": object_id_refs,
@@ -71,7 +72,7 @@ class PulseClassify:
 
         if cluster_grps:
             try:
-                result = await self.collection.insert_many(cluster_grps)
+                result = await self.Groupcollection.insert_many(cluster_grps)
                 logger.info(
                     "Inserted article classification clusters",
                     category=category,
@@ -83,7 +84,7 @@ class PulseClassify:
 
         if articles_ids_to_update:
             try:
-                result = await self.collection.update_many(
+                result = await self.articleCollection.update_many(
                     {"_id": {"$in": articles_ids_to_update}},
                     {"$set": {"status": "Classified"}}
                 )
@@ -124,7 +125,23 @@ class PulseClassify:
 
         #now we have to perform the calculate the simularity globally for all the articles simultnaeously, for that we will use the dot product of the embeddings with its transpose to get the cosine similarity matrix
 
+        norms = np.linalg.norm(embeddings_array, axis=1, keepdims=True)
+        # Prevent division by zero just in case
+        norms[norms == 0] = 1e-10
+        embeddings_array = embeddings_array / norms
+
         similarity_matrix = np.dot(embeddings_array, embeddings_array.T)
+
+
+        # Exclude self-similarity (the 1.0s on the diagonal) to check true pair similarities
+        flat_sims = similarity_matrix[~np.eye(similarity_matrix.shape[0], dtype=bool)]
+        logger.info(
+            "Actual Similarity Stats",
+            min=float(np.min(flat_sims)),
+            max=float(np.max(flat_sims)),
+            mean=float(np.mean(flat_sims)),
+            median=float(np.median(flat_sims))
+        )
 
         #convert them into True False for further cals
 
@@ -163,7 +180,7 @@ class PulseClassify:
         
         logger.info("Fetching article embeddings for classification", category=category)
         try:
-            cursor = self.collection.find(
+            cursor = self.articleCollection.find(
                 {
                     "category": category,
                     "status" : {"$ne": "Classified"}  # Exclude already classified articles

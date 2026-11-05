@@ -23,7 +23,7 @@ async def implement_embedding_handler(job:Job):
             db = db,
             concurrency_limit=5,
             max_retries=3,
-            transformer_model='sentence-transformers/all-MiniLM-L6-v2'
+            transformer_model='sentence-transformers/all-mpnet-base-v2'
         )
 
         #all the required batching , processing asyn, controlling the simultaneous async threads all are controlled by the PulseCleanClass itself
@@ -44,7 +44,7 @@ async def implement_classification_handler(job:Job):
         #Initiallzing our crawler bot for crawling
         pulseclean = PulseClassify(
             db = db,
-            threshold=0.8
+            threshold=0.6
         )
 
         # Iterate over enum members, then use their database value rather than the enum name.
