@@ -107,8 +107,6 @@ async def implement_scrapper_handler(job:Job):
             logger.error("The crawled articles arent being cached......")
             return
 
-        cached_crawl_objects = cached_crawl_objects[1:] #the first element in the redis array is b'value' since we dont need that just eliminating the first element out 
-
         # Initiallzing our crawler bot for crawling
         pulsebot = PulseBotScrapper(
             db = db,
@@ -129,17 +127,8 @@ async def implement_scrapper_handler(job:Job):
 
     finally:
         #once all the process completed either successfull or failure cleanig up the openened connections
-        await redis_client.close()
-        await db.client.close()
+        # await redis_client.close()
+        # await db.client.close()
+        pass
             
             
-async def route_data_fetch_task(job:Job, token:str) -> Any:
-    """
-    Routes to the respected function that is the task which is to be performed by the Worker
-    """
-    logger.info("Got a task, looking for the function suitable to execute this.")
-
-    if job.name == "implement_crawler":
-        return await implement_crawler_handler(job)
-    elif job.name == "implement_scrapper":
-        return await implement_scrapper_handler(job)

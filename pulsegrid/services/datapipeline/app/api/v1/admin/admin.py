@@ -115,3 +115,16 @@ async def implement_embedding():
         message="Embedding task successfully enqueued.",
         data=f"Job ID: {job.id}"
     )
+
+@router.get("/classify", response_model=ApiResponseSchema[str])
+async def implement_classification():
+
+    # Offload task to BullMQ queue
+    queue = get_queue('data_pipeline')
+    job = await queue.add("implement_classification", {})
+
+    return ApiResponseSchema(
+        status_code=200,
+        message="Classification task successfully enqueued.",
+        data=f"Job ID: {job.id}"
+    )

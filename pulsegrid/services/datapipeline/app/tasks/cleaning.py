@@ -67,4 +67,5 @@ async def implement_classification_handler(job:Job):
 
     finally:
         #once all the process completed either successfull or failure cleanig up the openened connections
-        await db.client.close()
+        # await db.client.close()
+        pass

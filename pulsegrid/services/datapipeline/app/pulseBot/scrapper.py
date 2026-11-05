@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import hashlib
 import json
 import random
 
@@ -33,6 +34,10 @@ class PulseBotScrapper:
         self.profiles = PROFILES 
         self.semaphore = asyncio.Semaphore(concurrency_limit)
         self.cache_key = 'pulsegrid:sources:article_meta_data:all'
+        self.processed_urls_cache_key = 'pulsegrid:sources:scraper:processed_urls'
+
+    def _processed_url_identity(self, crawl_object_id: str | ObjectId, url: str) -> str:
+        return hashlib.sha256(f"{crawl_object_id}:{url}".encode()).hexdigest()
 
     async def _process_single_url(self, session: AsyncSession, url: str, crawl_object: CrawlObjectSchema) -> bool:
         """Helper method to handle scraping and saving a single URL with retries."""
@@ -40,6 +45,25 @@ class PulseBotScrapper:
         Semaphore is used to control the cuncorrent network request, like cuncorrent is to be used with http request or any form of network request
         """
         async with self.semaphore:
+            crawl_object_id = None
+            if isinstance(crawl_object.id, ObjectId):
+                crawl_object_id = crawl_object.id
+            elif crawl_object.id and ObjectId.is_valid(str(crawl_object.id)):
+                crawl_object_id = ObjectId(str(crawl_object.id))
+            crawl_object_id = crawl_object_id or crawl_object.source_id
+            processed_url_identity = self._processed_url_identity(crawl_object_id, url)
+
+            if self.redis is not None and await self.redis.sismember(
+                self.processed_urls_cache_key,
+                processed_url_identity,
+            ):
+                logger.info(
+                    "Skipping URL found in processed cache",
+                    url=url,
+                    source_id=crawl_object.source_id,
+                )
+                return True
+
             browser_profile = random.choice(self.profiles)
             
             for attempt in range(1, self.max_retries + 1):
@@ -63,7 +87,7 @@ class PulseBotScrapper:
                         body_of_the_article = trafilatura.extract(response.text)
 
                         article_metadata = {
-                            "crawl_object_id": ObjectId(str(crawl_object.id)) if isinstance(crawl_object.id, ObjectId) is False else crawl_object.id,
+                            "crawl_object_id": crawl_object_id or crawl_object.source_id,
                             "category": crawl_object.category,
                             "title": title_of_the_article,  
                             "body": body_of_the_article,
@@ -72,15 +96,39 @@ class PulseBotScrapper:
                             "updated_at": datetime.datetime.now(datetime.timezone.utc),
                         }
                         
-                        # MongoDB mutates dict in-place by adding `_id`
-                        result = await self.db["articleMetaData"].insert_one(article_metadata)
+                        collection = self.db["articleMetaData"]
+                        result = await collection.update_one(
+                            {
+                                "crawl_object_id": crawl_object_id or crawl_object.source_id,
+                                "url": url,
+                            },
+                            {"$set": article_metadata},
+                            upsert=True,
+                        )
 
                         if result.acknowledged:
-                            logger.info(f"Added article metadata into DB (attempt {attempt})", url=url, source_id=crawl_object.source_id)
-
                             if self.redis is not None:
+                                await self.redis.sadd(
+                                    self.processed_urls_cache_key,
+                                    processed_url_identity,
+                                )
+
+                            if result.upserted_id is None:
+                                logger.info(
+                                    "Article already existed; refreshed metadata",
+                                    url=url,
+                                    source_id=crawl_object.source_id,
+                                )
+                            else:
+                                logger.info(
+                                    f"Added article metadata into DB (attempt {attempt})",
+                                    url=url,
+                                    source_id=crawl_object.source_id,
+                                )
+
+                            if result.upserted_id is not None and self.redis is not None:
                                 # Convert ObjectId or datetimes gracefully for Redis caching
-                                cache_data = {**article_metadata, "_id": str(article_metadata.get("_id"))}
+                                cache_data = {**article_metadata, "_id": str(result.upserted_id)}
                                 await self.redis.rpush(
                                     self.cache_key,
                                     json.dumps(cache_data, default=str),
@@ -111,8 +159,9 @@ class PulseBotScrapper:
     async def scrap_the_URL(self, session: AsyncSession, crawl_object: CrawlObjectSchema) -> bool:
         urls_to_scrape = crawl_object.article_urls
         result_tracker: list[bool] = []
+        unique_urls = list(dict.fromkeys(urls_to_scrape))
 
-        for url in urls_to_scrape:
+        for url in unique_urls:
             success = await self._process_single_url(session, url, crawl_object)
             result_tracker.append(success)
             
@@ -122,6 +171,13 @@ class PulseBotScrapper:
         return all(result_tracker) if result_tracker else False
 
     async def load_the_collection(self, crawlObjects: list[CrawlObjectSchema]):
+        if self.redis is not None:
+            await self.redis.delete(self.processed_urls_cache_key)
+            logger.info(
+                "Reset processed URL cache for scraping run",
+                crawl_object_count=len(crawlObjects),
+            )
+
         async with AsyncSession() as session:
             tasks = [
                 self.scrap_the_URL(session=session, crawl_object=crawl_source)
