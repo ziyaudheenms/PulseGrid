@@ -3,11 +3,12 @@ import structlog
 from bullmq import Job
 
 from pulseClean.embedEngine import PulseCleanEmbedd
+from pulseClean.pulseClassify import  PulseClassify
 
 from core.database import get_database
 from core.config import settings
 from core.logging import setup_logging
-
+from schema.source_schema import SourceScope
 setup_logging()
 logger = structlog.get_logger()
 
@@ -36,4 +37,34 @@ async def implement_embedding_handler(job:Job):
 
 
 async def implement_classification_handler(job:Job):
-    pass
+
+    db = await get_database()
+
+    try:
+        #Initiallzing our crawler bot for crawling
+        pulseclean = PulseClassify(
+            db = db,
+            threshold=0.8
+        )
+
+        # Iterate over enum members, then use their database value rather than the enum name.
+        for category in SourceScope:
+            category_name = category.value
+            embeddings, article_ids = await pulseclean.get_article_embeddings(category=category_name)
+
+            if not embeddings or not article_ids:
+                logger.info("No articles available for classification", category=category_name)
+                continue
+
+            clusters_map: dict[str, list[str]] = await pulseclean.classify_articles(
+                embeddings=embeddings,
+                article_ids=article_ids,
+            )
+            if not clusters_map:
+                continue
+
+            await pulseclean.add_to_db(clusters_map=clusters_map, category=category_name)
+
+    finally:
+        #once all the process completed either successfull or failure cleanig up the openened connections
+        await db.client.close()

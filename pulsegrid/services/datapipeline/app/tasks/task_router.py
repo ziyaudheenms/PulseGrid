@@ -8,7 +8,7 @@ from typing import Any
 import structlog
 from bullmq import Job
 
-from tasks.cleaning import implement_embedding_handler
+from tasks.cleaning import implement_embedding_handler, implement_classification_handler
 from core.logging import setup_logging
 from tasks.data_fetch import implement_crawler_handler, implement_scrapper_handler
 
@@ -33,3 +33,6 @@ async def route_fetch_task(job:Job, token:str) -> Any:
     elif job.name == "implement_embedding":
         logger.info("MATCHED: implement_embedding", job_name=job.name)
         return await implement_embedding_handler(job)
+    elif job.name == "implement_classification":
+            logger.info("MATCHED: implement_classification", job_name=job.name)
+            return await implement_classification_handler(job)

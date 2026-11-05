@@ -29,11 +29,12 @@ logger = structlog.get_logger()
 class PulseClassify:
     def __init__(
         self, 
-        db:AsyncDatabase    
+        db:AsyncDatabase,
+        threshold: float
     ):
         self.db = db
         self.collection = self.db["articleMetaData"]
-        self.similarity_threshold = 0.8  # Define a threshold for cosine similarity to consider articles as similar
+        self.similarity_threshold = threshold  # Define a threshold for cosine similarity to consider articles as similar
 
 
     async def add_to_db(self, clusters_map: dict[str, list[str]], category: str):
@@ -100,7 +101,7 @@ class PulseClassify:
     async def classify_articles(self, embeddings: list, article_ids: list):
         """
             Now we have the embeddings and the article ids as of in correct order, what we need is just to perform the futher ops,
-            error handling of if the embeddings are empty or the article ids are empty will be handled outside 
+            error handling of if the embeddings are empty or the article ids are empty will be handled within this function itself 
         """
         if not embeddings or not article_ids:
             logger.error("Cannot classify articles with empty embeddings or article IDs", embedding_count=len(embeddings), article_id_count=len(article_ids))
@@ -174,7 +175,7 @@ class PulseClassify:
             )
         except Exception as exc:
             logger.error("Failed to query article embeddings", category=category, error=str(exc), exc_info=True)
-            return
+            return [], []
 
         embeddings = []
         article_ids = []
@@ -186,7 +187,7 @@ class PulseClassify:
                     article_ids.append(document["_id"])
         except Exception as exc:
             logger.error("Failed while reading article embeddings", category=category, error=str(exc), exc_info=True)
-            return
+            return [], []
         
         logger.info(
             "Fetched article embeddings for classification",
