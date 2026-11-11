@@ -1,6 +1,7 @@
 import asyncio
 import math
 from collections.abc import Mapping, Sequence
+from datetime import datetime, timezone
 from functools import partial
 from typing import Any
 
@@ -89,6 +90,11 @@ class PulseBaitAnalysis:
                 )
                 return None
 
+            article_id = article.get("_id")
+            if article_id is None:
+                logger.error("Cannot save genuinity score for article without an ID", title=title)
+                return None
+
             loop = asyncio.get_running_loop()
             vectors: list[list[float]] | None = None
             texts = [title.strip(), *sentences]
@@ -129,15 +135,32 @@ class PulseBaitAnalysis:
                 for sentence_vector in vectors[1:]
             ]
             top_scores = sorted(similarities, reverse=True)[:2]
-            genuinity_score = sum(top_scores) / len(top_scores)
+            genunity_score = sum(top_scores) / len(top_scores)
+
+            result = await self.collection.update_one(
+                {"_id": article_id},
+                {
+                    "$set": {
+                        "genunity_score": genunity_score,
+                        "updated_at": datetime.now(timezone.utc),
+                    }
+                },
+            )
+            if result.matched_count != 1:
+                logger.info(
+                    "X=Can't store the genuinity score in DB",
+                    title=title,
+                    genunity_score=genunity_score,
+                    article_id=article_id,
+                )
 
             logger.info(
                 "Article genuinity score",
                 title=title,
-                genuinity_score=genuinity_score,
-                article_id=article.get("_id"),
+                genunity_score=genunity_score,
+                article_id=article_id,
             )
-            return genuinity_score
+            return genunity_score
 
     @staticmethod
     def _cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
