@@ -79,7 +79,7 @@ class PulseBaitAnalysis:
 
             sentences = [
                 sentence.text.strip()
-                for sentence in self.nlp(body).sents
+                for sentence in self.nlp(body).sents   #using the npl.sents inorder to get the no of sentenses in the givrn article.
                 if sentence.text.strip()
             ][:5]
             if not sentences:
