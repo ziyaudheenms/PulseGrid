@@ -4,6 +4,7 @@ from bullmq import Job
 
 from pulseClean.embedEngine import PulseCleanEmbedd
 from pulseClean.pulseClassify import  PulseClassify
+from pulseRanking.clickBait import PulseBaitAnalysis
 
 from core.database import get_database
 from core.config import settings
@@ -69,3 +70,16 @@ async def implement_classification_handler(job:Job):
         #once all the process completed either successfull or failure cleanig up the openened connections
         # await db.client.close()
         pass
+
+
+async def implement_clickbait_handler(job: Job):
+    logger.info("Starting clickbait analysis", job_name=job.name)
+    db = await get_database()
+
+    analyzer = PulseBaitAnalysis(
+        db=db,
+        concurrency_limit=3,
+        max_retries=3,
+        transformer_model="sentence-transformers/all-mpnet-base-v2",
+    )
+    await analyzer.analyze_all_categories()
