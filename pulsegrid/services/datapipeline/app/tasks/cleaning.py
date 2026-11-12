@@ -82,4 +82,26 @@ async def implement_clickbait_handler(job: Job):
         max_retries=3,
         transformer_model="sentence-transformers/all-mpnet-base-v2",
     )
-    await analyzer.analyze_all_categories()
+    await analyzer.initiate_analysis()
+
+
+# async def implement_mattr_scoring(job: Job):
+#     logger.info("Starting mattr analysis scoring", job_name=job.name)
+#     db = await get_database()
+
+#     for category in SourceScope:
+#         category_name = category.value
+#         embeddings, article_ids = await pulseclean.get_article_embeddings(category=category_name)
+
+#         if not embeddings or not article_ids:
+#             logger.info("No articles available for classification", category=category_name)
+#             continue
+
+#         clusters_map: dict[str, list[str]] = await pulseclean.classify_articles(
+#             embeddings=embeddings,
+#             article_ids=article_ids,
+#         )
+#         if not clusters_map:
+#             continue
+
+#         await pulseclean.add_to_db(clusters_map=clusters_map, category=category_name)

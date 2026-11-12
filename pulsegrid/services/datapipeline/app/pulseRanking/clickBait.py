@@ -7,7 +7,10 @@ from typing import Any
 
 import spacy
 import structlog
+from bson import ObjectId
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo import UpdateOne
+from pymongo.errors import BulkWriteError
 from sentence_transformers import SentenceTransformer
 
 from core.logging import setup_logging
@@ -24,6 +27,7 @@ class PulseBaitAnalysis:
         concurrency_limit: int = 3,
         max_retries: int = 3,
         transformer_model: str = "sentence-transformers/all-mpnet-base-v2",
+        batch_size: int = 50
     ) -> None:
         if concurrency_limit < 1:
             raise ValueError("concurrency_limit must be greater than zero")
@@ -35,29 +39,185 @@ class PulseBaitAnalysis:
         self.max_retries = max_retries
         self.transformer = SentenceTransformer(transformer_model)
         self.nlp = spacy.load("en_core_web_sm")
+        self.batch_size = batch_size
+    
+    async def initiate_analysis(self):
+        """
+            Since this operation is performed with all the documents in the DB , we have to fetch all off them, but directly calling
+            them is a bad idea and drops performance
 
-    async def analyze_all_categories(self) -> None:
-        for category in SourceScope:
-            await self.analyze_category(category.value)
+            Lets implement the batch based updation of the articles using the last seen id using the while loop as long as we get the documents from the db
 
-    async def analyze_category(self, category: str) -> list[float | None]:
-        cursor = self.collection.find({"category": category})
-        articles = await cursor.to_list(length=None)
+        """
+
+        last_seen_id = None
+        bool_result_batches = []
+        
+        while True:
+            #the baseline query that will be used
+            query: dict[str, Any] = {
+                # "status": {"$ne": "BAITSCORE"}
+            }
+
+            if last_seen_id:
+                query["_id"] = {"$gt": last_seen_id}
+
+            #projections includes the fields that is to be fetched for the matching records --> only specified fields will be fetcheddd
+            projection = {
+                "title": 1,
+                "body": 1,  # or "content" depending on your schema field name
+            }
+
+            cursor = (
+                self.collection.find(query, projection)
+                .sort("_id", 1)
+                .limit(self.batch_size)
+            )
+
+            #here we dont need to implement the pydantic serialization, that causes high compute resources
+            batch_articles: list[dict[str, Any]] = []
+
+            async for doc in cursor:
+                doc_id = str(doc.get("_id"))
+                title = doc.get("title", "")
+                text = doc.get("body") or doc.get("text", "")
+
+                if text and text.strip():
+                        #storing the data as onjects 
+                    batch_articles.append({
+                        "doc_id": doc_id,
+                        "title": title,
+                        "body": text
+                    })   
+
+
+            
+            if not batch_articles:
+                break #this helps to stop the loop when no more documents is presnt
+
+            batch_no = str(last_seen_id) if last_seen_id else 'initial batch'
+            bool_result = await self._initiate_analysis(batch_articles, batch_no)
+            logger.info('here the results are ', result = bool_result)
+            bool_result_batches.append(bool_result)
+
+            last_seen_id = ObjectId(batch_articles[-1]["doc_id"])#updating the last seen id so that the last doc's id of the loop will be stored there.
+
+            await asyncio.sleep(0.05)  #a pause btw each batch fetching
+
+
+
+        if False in bool_result_batches:
+            logger.info(
+                "All batches havent compltly processed genunity score",
+                results = bool_result_batches
+            )
+        else:
+            logger.info(
+                "All batches successfully passed genunity score",
+                results = bool_result_batches
+            )
+            
+        return
+
+  
+    async def bulk_updation_db(self, data_to_update: list[dict[str, Any]| None]) -> bool:
+        """
+        We will implement the bulk updation of the records
+        """
+
+        operations = []
+        data_count = len(data_to_update)
+
+        if data_count == 0:
+            return True
+
+        for data in data_to_update:
+            if not data:
+                data_count -= 1
+                continue  #we can contain null cases where the genuntiy scoring is not able to implement , so we are avoidgn them
+            
+            doc_id = data["doc_id"]
+            operations.append(
+                UpdateOne(
+                    {"_id": ObjectId(doc_id)},
+                    {
+                        "$set": {
+                            "genunity_score": data["genunity_score"],
+                            "status": "BAITSCORE"  # status will be updated to implement MATTR
+                        }
+                    }
+                )
+            )
+
+        try:
+            # 1. Execute bulk write and capture the acknowledgment result object
+            result = await self.collection.bulk_write(operations, ordered=False)
+            
+            # 2. Extract acknowledgment metrics from the result object
+            matched = result.matched_count
+            modified = result.modified_count  # if the coming data is already the value , mongodb will not perform the updatioin function
+            
+            logger.info(
+                "Saved genunity scores to database",
+                record_count=data_count,
+                matched_count=matched,
+                modified_count=modified,
+            )
+
+            #modified sometimes comes less becase may be if the updating value exists, the modified doesnt counts
+            return matched == data_count
+
+        except BulkWriteError as bwe:
+            # 3. Handle partial failures if `ordered=False` encounters specific document errors
+            details = bwe.details
+            successful_modifications = details.get("nModified", 0)
+            logger.warning(
+                "Bulk write completed with errors",
+                record_count=data_count,
+                modified_count=successful_modifications,
+                write_error_count=len(details.get("writeErrors", [])),
+            )
+            return successful_modifications == data_count
+
+        except Exception as e:
+            # 4. Handle catastrophic network or connection drops
+            logger.error(
+                "Unexpected database error during bulk write",
+                record_count=data_count,
+                error=str(e),
+                exc_info=True,
+            )
+            return False
+
+
+    async def _initiate_analysis(self, articles:list[dict[str, Any]], batch_id: str):
+        """
+        Here using the asyncio.gather we will fire the articles of the batch which will be handled by the semaphore 
+        
+        """
 
         if not articles:
-            logger.info("No articles available for clickbait analysis", category=category)
-            return []
+            logger.info("No articles available for clickbait analysis", batch_id=batch_id)
 
+        results_to_update_db = []
+        #generating the task and shooting up with asyncio
+        tasks = [self._analyze_article(article) for article in articles]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         logger.info(
-            "Analyzing all articles for category",
-            category=category,
-            article_count=len(articles),
+            "Completed the genunity scoring of current batch",
+            batch_id = batch_id,
+            batch_size = len(articles)
         )
-        return await asyncio.gather(
-            *(self._analyze_article(article) for article in articles)
+        #we will forward the request to implement the bulk update of the genunity scores
+        bool_result = await self.bulk_updation_db(results)  #if all the valid articles are updated with the genunity score we will get true or false will be returned
+        logger.info(
+            "Completed the DB updation of current batch",
+            batch_id = batch_id,
+            batch_size = len(articles)
         )
+        return bool_result
 
-    async def _analyze_article(self, article: Mapping[str, Any]) -> float | None:
+    async def _analyze_article(self, article: dict[str, Any]) -> dict[str, Any] | None:
         async with self.semaphore:
             title = article.get("title")
             body = article.get("body")
@@ -65,7 +225,7 @@ class PulseBaitAnalysis:
             if not isinstance(title, str) or not title.strip():
                 logger.warning(
                     "Skipping clickbait analysis for article without a title",
-                    article_id=article.get("_id"),
+                    article_id=article.get("doc_id"),
                 )
                 return None
 
@@ -73,7 +233,7 @@ class PulseBaitAnalysis:
                 logger.warning(
                     "Skipping clickbait analysis for article without a body",
                     title=title,
-                    article_id=article.get("_id"),
+                    article_id=article.get("doc_id"),
                 )
                 return None
 
@@ -86,11 +246,11 @@ class PulseBaitAnalysis:
                 logger.warning(
                     "Skipping clickbait analysis because no sentences were extracted",
                     title=title,
-                    article_id=article.get("_id"),
+                    article_id=article.get("doc_id"),
                 )
                 return None
 
-            article_id = article.get("_id")
+            article_id = article.get("doc_id")
             if article_id is None:
                 logger.error("Cannot save genuinity score for article without an ID", title=title)
                 return None
@@ -115,7 +275,7 @@ class PulseBaitAnalysis:
                     logger.exception(
                         "Failed to generate clickbait-analysis embeddings",
                         title=title,
-                        article_id=article.get("_id"),
+                        article_id=article.get("doc_id"),
                         attempt=attempt,
                         max_retries=self.max_retries,
                     )
@@ -126,7 +286,7 @@ class PulseBaitAnalysis:
                 logger.error(
                     "Unable to generate clickbait-analysis embeddings after retries",
                     title=title,
-                    article_id=article.get("_id"),
+                    article_id=article.get("doc_id"),
                 )
                 return None
 
@@ -137,30 +297,23 @@ class PulseBaitAnalysis:
             top_scores = sorted(similarities, reverse=True)[:2]
             genunity_score = sum(top_scores) / len(top_scores)
 
-            result = await self.collection.update_one(
-                {"_id": article_id},
-                {
-                    "$set": {
-                        "genunity_score": genunity_score,
-                        "updated_at": datetime.now(timezone.utc),
-                    }
-                },
-            )
-            if result.matched_count != 1:
-                logger.info(
-                    "X=Can't store the genuinity score in DB",
-                    title=title,
-                    genunity_score=genunity_score,
-                    article_id=article_id,
-                )
-
             logger.info(
                 "Article genuinity score",
                 title=title,
                 genunity_score=genunity_score,
                 article_id=article_id,
             )
-            return genunity_score
+
+            genunity_result = {
+                "doc_id": article_id,
+                "genunity_score": genunity_score
+            }
+            return genunity_result
+
+
+
+
+
 
     @staticmethod
     def _cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:

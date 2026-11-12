@@ -39,7 +39,12 @@ from collections import Counter
 from pymongo.errors import BulkWriteError
 from concurrent.futures import ProcessPoolExecutor
 from pymongo.asynchronous.database import AsyncDatabase
+import structlog
+from core.logging import setup_logging
 
+
+setup_logging()
+logger = structlog.get_logger(__name__)
 
 #global refernnce that which is used so inorder to start only one spacy model per processor core
 _WORKER_NLP = None
@@ -121,20 +126,34 @@ class PulseGridDepthScorer:
             matched = result.matched_count
             modified = result.modified_count
             
-            print(f"Bulk Write Acknowledged: Matched {matched}, Modified {modified} documents.")
+            logger.info(
+                "Saved depth scores to database",
+                record_count=len(records),
+                matched_count=matched,
+                modified_count=modified,
+            )
             return modified
 
         except BulkWriteError as bwe:
             # 3. Handle partial failures if `ordered=False` encounters specific document errors
             details = bwe.details
             successful_modifications = details.get("nModified", 0)
-            print(f"Bulk write completed with errors. Successfully modified: {successful_modifications}")
-            print(f"Error details: {details.get('writeErrors')}")
+            logger.warning(
+                "Bulk write completed with errors",
+                record_count=len(records),
+                modified_count=successful_modifications,
+                write_error_count=len(details.get("writeErrors", [])),
+            )
             return successful_modifications
 
         except Exception as e:
             # 4. Handle catastrophic network or connection drops
-            print(f"Unexpected database error during bulk write: {e}")
+            logger.error(
+                "Unexpected database error during bulk write",
+                record_count=len(records),
+                error=str(e),
+                exc_info=True,
+            )
             return 0
 
     def _extract_content_and_quantities(self, doc: Doc) -> tuple[list[str], int, int]:
@@ -298,11 +317,23 @@ class PulseGridDepthScorer:
                 "ranking_depth_score": round(final_depth_score, 4),
             })
 
+        logger.info(
+            "Scored depth analysis batch",
+            batch_size=len(batch),
+            scored_count=len(results),
+            skipped_count=len(batch) - len(results),
+        )
         return results
 
 
     #the function that which initiates all the artciles
     async def run_pipeline(self) -> int:
+        logger.info(
+            "Starting depth scoring pipeline",
+            model_name=self.model_name,
+            max_workers=self.max_workers,
+            chunk_size=self.chunk_size,
+        )
         loop = asyncio.get_running_loop()
         total_processed = 0
         last_seen_id = None  #used to track the cursor of the last seen id
@@ -310,7 +341,7 @@ class PulseGridDepthScorer:
         # Boot up the ProcessPoolExecutor once for the entire pipeline run
         with ProcessPoolExecutor(
             max_workers=self.max_workers,
-            initializer=_init_worker,
+            initializer=_init_worker, #this is used to initiate the workers with the scapy model
             initargs=(self.model_name,)
         ) as pool:
             
@@ -351,6 +382,9 @@ class PulseGridDepthScorer:
                 if scored_results:
                     await self.save_scores_to_database(scored_results)
                     total_processed += len(scored_results)
-                    print(f"Processed and saved batch of {len(scored_results)} articles...")
 
+        logger.info(
+            "Completed depth scoring pipeline",
+            total_processed=total_processed,
+        )
         return total_processed
