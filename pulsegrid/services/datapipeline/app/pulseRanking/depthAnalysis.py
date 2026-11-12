@@ -134,3 +134,48 @@ class PulseGridDepthScorer:
         ]
         
         return concepts, quantity_count, unique_entity_count
+
+
+    def _compute_mattr(self, tokens: list[str]) -> float:
+        """
+        We will be implementing the actual mattr analysis of eah article here
+        """
+
+        n = len(tokens)
+        if n == 0:
+            return 0.0
+        if n <= self.window_size:
+            return len(set(tokens)) / n
+
+        #now we have to implement the sliding window thing into the pipline.
+        #we have to utitlize the Counter of python for avoiding the O(n2) time complexity
+        #Counter when passed with a array into it it generates a dict with each unique element in the given array with there occurance number, by taking the len() property of the counter object we will get the no of unique entities.
+
+        count = Counter(tokens[:self.window_size])  #for the inital window
+        unique_count = len(count)
+        ttr_sum = unique_count / self.window_siz
+
+        for i in range(self.window_size, n):
+
+            #cleaning process of the left most element that is to be deleted.
+            outgoing = tokens[i - self.window_size]
+            count[outgoing] -= 1
+            if count[outgoing] == 0: #which means the unique counter doesnt contains that word
+                #so we have to upate such a way that the len(count) reduces ones since its deletes
+                unique_count -= 1
+
+            #we have to add the incoming token from the right
+            incoming = tokens[i]
+            #we have to ensure that the counter not have this token if so we will increment the unique else we will not change the unique
+            if count[incoming] == 0:  #0 represts that the item is absent in counter.
+                unique_count += 1
+            #we have to update this token in the counter
+            count[incoming] += 1
+
+            #niw perform the ttr operation
+            ttr_sum += unique_count / self.window_size  
+
+        #once this loops completes the execution we have to takle the mean(average) and return them.
+
+        return ttr_sum / (n - self.window_size + 1)  # this gives the possible window size.(DENOMINATOR)
+    
