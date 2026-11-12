@@ -80,6 +80,15 @@ class PulseGridDepthScorer:
             if ent.label_ in self.quantifiable_labels: #if any entity (unique words) belongs to the quantifiable labels we can increase the count
                 quantity_count += 1
 
+        #we also have to extract the count of unique entities that which has been displayed in the article
+        #set() has been used so that to automatically avoid the duplicate entities get intot the list
+        unique_entities = set(
+            ent.text.strip().lower()
+            for ent in doc.ents
+            if ent.label_ not in self.ignored_entities and len(ent.text.strip()) > 1
+        )
+        unique_entity_count = len(unique_entities)
+
 
         #next we have to prepare the tokens(words) for the mattr scoring analysis.
         #for that firt we need to map all the entities count --> (organizations , people , name etc)
@@ -124,4 +133,4 @@ class PulseGridDepthScorer:
             if not t.is_stop and not t.is_punct and (t.is_alpha or "_" in t.lemma_) #we will be cleaning out the full stop and punctuation marks
         ]
         
-        return concepts, quantity_count
+        return concepts, quantity_count, unique_entity_count
