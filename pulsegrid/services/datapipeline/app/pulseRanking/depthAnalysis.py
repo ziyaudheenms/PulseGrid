@@ -28,10 +28,17 @@
 
 import asyncio
 import math
-from collections import Counter
-from concurrent.futures import ProcessPoolExecutor
 import spacy
+
+
+from typing import Any
+from bson import ObjectId
 from spacy.tokens import Doc
+from pymongo import UpdateOne
+from collections import Counter
+from pymongo.errors import BulkWriteError
+from concurrent.futures import ProcessPoolExecutor
+from pymongo.asynchronous.database import AsyncDatabase
 
 
 #global refernnce that which is used so inorder to start only one spacy model per processor core
@@ -46,6 +53,7 @@ def _init_worker(model_name: str):
 class PulseGridDepthScorer:
     def __init__(
         self,
+        db: AsyncDatabase,
         model_name: str = "en_core_web_sm",
         window_size: int = 40,
         max_phrase_len: int = 3,
@@ -53,12 +61,14 @@ class PulseGridDepthScorer:
         max_workers: int = 4,
         chunk_size: int = 250,
     ):
+        self.db = db
         self.model_name = model_name
         self.window_size = window_size
         self.max_phrase_len = max_phrase_len
         self.batch_size = batch_size
         self.max_workers = max_workers
         self.chunk_size = chunk_size
+        self.collection = self.db["articleMetaData"]
 
         # Entity labels ignored during compound phrase merging
         self.ignored_entities = {"DATE", "TIME", "ORDINAL"}
@@ -66,6 +76,66 @@ class PulseGridDepthScorer:
         # Entity labels tracked for information density bonuses
         self.quantifiable_labels = {"PERCENT", "MONEY", "QUANTITY", "CARDINAL"}
 
+
+    async def save_scores_to_database(self, records : list[dict[str, Any]]):
+        """"
+        We have to update the DB , here we want to implement the bulk addititon is order ti reduce the time complexity else it will be og O(n+1).
+        here since for each article the data to be appended gets changing, we cant use the update_many. therefore
+        we combine the update_one and collect all the update command for the incoming records and finally using rhe 
+        bulk write we will fire up all the update operations together.
+        """
+        if not records:
+            return
+
+        operations = []
+
+        for rec in records:
+            doc_id = rec["doc_id"]
+
+            #we are collecting all the updation commands for the DB operation
+            operations.append(
+                UpdateOne(
+                    {"_id": ObjectId(doc_id)},
+                    {
+                        "$set": {
+                            "ranking_depth_score": rec["ranking_depth_score"],
+                            "mattr": rec["mattr"],
+                            "total_concepts": rec["total_concepts"],
+                            "unique_concepts": rec["unique_concepts"],
+                            "quantity_count": rec["quantity_count"],
+                            "entity_count": rec["entity_count"],
+                            "status": "MATTR"  # status will be updated to implement MATTR
+                        }
+                    }
+                )
+            )
+
+        
+
+        #once all the records gets the updation commands , now we have to fire them all together
+        try:
+            # 1. Execute bulk write and capture the acknowledgment result object
+            result = await self.collection.bulk_write(operations, ordered=False)
+            
+            # 2. Extract acknowledgment metrics from the result object
+            matched = result.matched_count
+            modified = result.modified_count
+            
+            print(f"Bulk Write Acknowledged: Matched {matched}, Modified {modified} documents.")
+            return modified
+
+        except BulkWriteError as bwe:
+            # 3. Handle partial failures if `ordered=False` encounters specific document errors
+            details = bwe.details
+            successful_modifications = details.get("nModified", 0)
+            print(f"Bulk write completed with errors. Successfully modified: {successful_modifications}")
+            print(f"Error details: {details.get('writeErrors')}")
+            return successful_modifications
+
+        except Exception as e:
+            # 4. Handle catastrophic network or connection drops
+            print(f"Unexpected database error during bulk write: {e}")
+            return 0
 
     def _extract_content_and_quantities(self, doc: Doc) -> tuple[list[str], int, int]:
 
@@ -153,7 +223,7 @@ class PulseGridDepthScorer:
 
         count = Counter(tokens[:self.window_size])  #for the inital window
         unique_count = len(count)
-        ttr_sum = unique_count / self.window_siz
+        ttr_sum = unique_count / self.window_size
 
         for i in range(self.window_size, n):
 
@@ -229,3 +299,58 @@ class PulseGridDepthScorer:
             })
 
         return results
+
+
+    #the function that which initiates all the artciles
+    async def run_pipeline(self) -> int:
+        loop = asyncio.get_running_loop()
+        total_processed = 0
+        last_seen_id = None  #used to track the cursor of the last seen id
+
+        # Boot up the ProcessPoolExecutor once for the entire pipeline run
+        with ProcessPoolExecutor(
+            max_workers=self.max_workers,
+            initializer=_init_worker,
+            initargs=(self.model_name,)
+        ) as pool:
+            
+            # Use a while loop to pull and process batches until no articles remain
+            while True:
+                query: dict[str, Any] = {
+                    "status": {"$ne": "MATTR"}
+                }
+                if last_seen_id:
+                    query["_id"] = {"$gt": last_seen_id}
+
+                # Fetch a controlled batch from MongoDB
+                cursor = (
+                    self.collection.find(query, {"body": 1})
+                    .sort("_id", 1)
+                    .limit(self.chunk_size)
+                )
+                
+                chunk = []
+                async for doc in cursor:
+                    doc_id = str(doc.get("_id"))
+                    text = doc.get("body") or doc.get("text", "")
+                    
+                    if text and text.strip():
+                        chunk.append((doc_id, text))
+                    
+                    # Update the pagination anchor
+                    last_seen_id = doc["_id"]
+
+                # THE BREAK CONDITION: If the cursor found 0 articles, we are done!
+                if not chunk:
+                    break
+
+                # Dispatch this exact chunk directly to the worker pool
+                task = loop.run_in_executor(pool, self.process_batch, chunk) #handing the small chunks of the data to the saperate executor
+                scored_results = await task
+                
+                if scored_results:
+                    await self.save_scores_to_database(scored_results)
+                    total_processed += len(scored_results)
+                    print(f"Processed and saved batch of {len(scored_results)} articles...")
+
+        return total_processed
