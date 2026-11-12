@@ -67,7 +67,7 @@ class PulseGridDepthScorer:
         self.quantifiable_labels = {"PERCENT", "MONEY", "QUANTITY", "CARDINAL"}
 
 
-    def _extract_content_and_quantities(self, doc: Doc):
+    def _extract_content_and_quantities(self, doc: Doc) -> tuple[list[str], int, int]:
 
         #first we need to extract the qnantites mentioned in the article, which helps in understanding the depth
         quantity_count = 0
@@ -178,4 +178,54 @@ class PulseGridDepthScorer:
         #once this loops completes the execution we have to takle the mean(average) and return them.
 
         return ttr_sum / (n - self.window_size + 1)  # this gives the possible window size.(DENOMINATOR)
-    
+
+    def process_batch(self, batch: list[tuple[str, str]]) -> list[dict]:
+        """
+        process batch is usd to run the batch operation of the scoring mechanism, this batch will be
+        operated inside each cpu core by the processor
+        """
+
+        global _WORKER_NLP  #tells to take the re loaded global scapy configuration
+        results = []
+
+        #for ensuring the memmory safty, more than 25000 words will be get truncated, tis is used inorder to ensure that memmory spike will not get happened.
+        text_stream = (
+            (text[:25000].strip(), doc_id)
+            for doc_id, text in batch
+            if text and text.strip()
+        )
+
+        #for increasing the perfomrane, instead of a normal loop based nlp(text) we will be of using the .pipe() that process a batch of operations
+
+        for doc, doc_id in _WORKER_NLP.pipe(text_stream, as_tuples=True, batch_size=self.batch_size):
+            concepts, quantity_count, entity_count = self._extract_content_and_quantities(doc)
+            total_concepts = len(concepts)
+            mattr = self._compute_mattr(concepts)
+
+            #once we get all this required components, as of next part we have to implement the calculation for 
+            #the final ContentDepth score.
+
+            #first we hae to handle a case like a short para with some uniqe words may get more more mattr while a long para with good amount of unique gets low
+            #we will be using the log10 factor
+
+            base_depth = mattr * math.log10(total_concepts + 1) if total_concepts > 0 else 0.0
+
+            #now we have to encoperate the no of enitties and quantities that has beein  used in the article
+            #thing to note is that mattr score should dominate , so that depth analysis stays relevant , therefore only 20% will be the other factors add to the final depth scoreee
+
+            factuality_metric = quantity_count + (entity_count * 0.5) # entity is multiplid with 0.5 so that to prevent the bloating of the content just with random entity wordsss.
+            density_bonus = min(0.20, factuality_metric * 0.02) #80% will be dominated by the mattr score inly 20% by these factoresssss
+
+            final_depth_score = base_depth * (1.0 + density_bonus) #ensure even if deb=nsity bonus drops zero, the base depth doesnt breaks
+
+            results.append({
+                "doc_id": doc_id,
+                "total_concepts": total_concepts,
+                "unique_concepts": len(set(concepts)),
+                "quantity_count": quantity_count,
+                "entity_count": entity_count,
+                "mattr": round(mattr, 4),
+                "ranking_depth_score": round(final_depth_score, 4),
+            })
+
+        return results
