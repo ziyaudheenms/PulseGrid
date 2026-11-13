@@ -140,3 +140,16 @@ async def implement_clickbait_analysis():
         message="Clickbait analysis task successfully enqueued.",
         data=f"Job ID: {job.id}"
     )
+
+
+@router.post("/depth-analysis", response_model=ApiResponseSchema[str])
+async def implement_depth_analysis():
+    """Enqueue clickbait analysis for all articles in each category."""
+    queue = get_queue('data_pipeline')
+    job = await queue.add("implement_depth_analysis", {})
+
+    return ApiResponseSchema(
+        status_code=200,
+        message="depth analysis task successfully enqueued.",
+        data=f"Job ID: {job.id}"
+    )

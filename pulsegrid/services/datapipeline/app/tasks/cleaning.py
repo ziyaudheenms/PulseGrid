@@ -5,6 +5,7 @@ from bullmq import Job
 from pulseClean.embedEngine import PulseCleanEmbedd
 from pulseClean.pulseClassify import  PulseClassify
 from pulseRanking.clickBait import PulseBaitAnalysis
+from pulseRanking.depthAnalysis import PulseGridDepthScorer
 
 from core.database import get_database
 from core.config import settings
@@ -85,23 +86,13 @@ async def implement_clickbait_handler(job: Job):
     await analyzer.initiate_analysis()
 
 
-# async def implement_mattr_scoring(job: Job):
-#     logger.info("Starting mattr analysis scoring", job_name=job.name)
-#     db = await get_database()
+async def implement_depth_analysis(job: Job):
+    logger.info("Starting mattr analysis scoring", job_name=job.name)
+    db = await get_database()
 
-#     for category in SourceScope:
-#         category_name = category.value
-#         embeddings, article_ids = await pulseclean.get_article_embeddings(category=category_name)
+    depth_analyzer = PulseGridDepthScorer(
+            db=db,
+    )
+    await depth_analyzer.run_pipeline()
 
-#         if not embeddings or not article_ids:
-#             logger.info("No articles available for classification", category=category_name)
-#             continue
-
-#         clusters_map: dict[str, list[str]] = await pulseclean.classify_articles(
-#             embeddings=embeddings,
-#             article_ids=article_ids,
-#         )
-#         if not clusters_map:
-#             continue
-
-#         await pulseclean.add_to_db(clusters_map=clusters_map, category=category_name)
+   

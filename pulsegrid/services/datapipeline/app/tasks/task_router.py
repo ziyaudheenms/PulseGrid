@@ -12,6 +12,7 @@ from tasks.cleaning import (
     implement_clickbait_handler,
     implement_embedding_handler,
     implement_classification_handler,
+    implement_depth_analysis
 )
 from core.logging import setup_logging
 from tasks.data_fetch import implement_crawler_handler, implement_scrapper_handler
@@ -43,3 +44,6 @@ async def route_fetch_task(job:Job, token:str) -> Any:
     elif job.name == "implement_clickbait":
         logger.info("MATCHED: implement_clickbait", job_name=job.name)
         return await implement_clickbait_handler(job)
+    elif job.name == "implement_depth_analysis":
+            logger.info("MATCHED: implement_depth_analysis", job_name=job.name)
+            return await implement_depth_analysis(job)

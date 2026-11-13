@@ -155,8 +155,11 @@ class PulseGridDepthScorer:
                 exc_info=True,
             )
             return 0
-
-    def _extract_content_and_quantities(self, doc: Doc) -> tuple[list[str], int, int]:
+        
+    @staticmethod
+    def _extract_content_and_quantities(doc: Doc, max_phrase_len: int = 3) -> tuple[list[str], int, int]:
+        ignored_entities = {"DATE", "TIME", "ORDINAL"}
+        quantifiable_labels = {"PERCENT", "MONEY", "QUANTITY", "CARDINAL"}
 
         #first we need to extract the qnantites mentioned in the article, which helps in understanding the depth
         quantity_count = 0
@@ -166,7 +169,7 @@ class PulseGridDepthScorer:
                 quantity_count += 1
 
         for ent in doc.ents:
-            if ent.label_ in self.quantifiable_labels: #if any entity (unique words) belongs to the quantifiable labels we can increase the count
+            if ent.label_ in quantifiable_labels: #if any entity (unique words) belongs to the quantifiable labels we can increase the count
                 quantity_count += 1
 
         #we also have to extract the count of unique entities that which has been displayed in the article
@@ -174,7 +177,7 @@ class PulseGridDepthScorer:
         unique_entities = set(
             ent.text.strip().lower()
             for ent in doc.ents
-            if ent.label_ not in self.ignored_entities and len(ent.text.strip()) > 1
+            if ent.label_ not in ignored_entities and len(ent.text.strip()) > 1
         )
         unique_entity_count = len(unique_entities)
 
@@ -187,7 +190,7 @@ class PulseGridDepthScorer:
         #entity means simething meanigfull but we are limitng the word length to 3 for satfey purpose.
         entity_span = [
             ent for ent in doc.ents
-            if ent.label_ not in self.ignored_entities and len(ent) <= self.max_phrase_len
+            if ent.label_ not in ignored_entities and len(ent) <= max_phrase_len
         ]
 
         #next we need to map 'machine' 'learning' into one ---> machine_learning
@@ -199,7 +202,7 @@ class PulseGridDepthScorer:
                 #for example "credit card" card is token.head since credit describes card.
                 #if we found such words together we will join them into one , for now we will collect such words.
                 span = doc[token.i:token.head.i +1] #-> +1 so that we can include that
-                if len(span) <= self.max_phrase_len:
+                if len(span) <= max_phrase_len:
                     compound_span.append(span)  #we will add respective span of text into our array
 
         #next step we have to reorganize or retokenize the content based on the compound and pure entity
@@ -224,8 +227,8 @@ class PulseGridDepthScorer:
         
         return concepts, quantity_count, unique_entity_count
 
-
-    def _compute_mattr(self, tokens: list[str]) -> float:
+    @staticmethod
+    def _compute_mattr(tokens: list[str], window_size:int = 50) -> float:
         """
         We will be implementing the actual mattr analysis of eah article here
         """
@@ -233,21 +236,21 @@ class PulseGridDepthScorer:
         n = len(tokens)
         if n == 0:
             return 0.0
-        if n <= self.window_size:
+        if n <= window_size:
             return len(set(tokens)) / n
 
         #now we have to implement the sliding window thing into the pipline.
         #we have to utitlize the Counter of python for avoiding the O(n2) time complexity
         #Counter when passed with a array into it it generates a dict with each unique element in the given array with there occurance number, by taking the len() property of the counter object we will get the no of unique entities.
 
-        count = Counter(tokens[:self.window_size])  #for the inital window
+        count = Counter(tokens[:window_size])  #for the inital window
         unique_count = len(count)
-        ttr_sum = unique_count / self.window_size
+        ttr_sum = unique_count / window_size
 
-        for i in range(self.window_size, n):
+        for i in range(window_size, n):
 
             #cleaning process of the left most element that is to be deleted.
-            outgoing = tokens[i - self.window_size]
+            outgoing = tokens[i - window_size]
             count[outgoing] -= 1
             if count[outgoing] == 0: #which means the unique counter doesnt contains that word
                 #so we have to upate such a way that the len(count) reduces ones since its deletes
@@ -262,13 +265,14 @@ class PulseGridDepthScorer:
             count[incoming] += 1
 
             #niw perform the ttr operation
-            ttr_sum += unique_count / self.window_size  
+            ttr_sum += unique_count / window_size 
 
         #once this loops completes the execution we have to takle the mean(average) and return them.
 
-        return ttr_sum / (n - self.window_size + 1)  # this gives the possible window size.(DENOMINATOR)
+        return ttr_sum / (n - window_size + 1)  # this gives the possible window size.(DENOMINATOR)
 
-    def process_batch(self, batch: list[tuple[str, str]]) -> list[dict]:
+    @staticmethod
+    def process_batch( batch: list[tuple[str, str]], batch_size:int = 64,  max_phrase_len: int = 3, window_size: int = 50) -> list[dict]:
         """
         process batch is usd to run the batch operation of the scoring mechanism, this batch will be
         operated inside each cpu core by the processor
@@ -286,10 +290,10 @@ class PulseGridDepthScorer:
 
         #for increasing the perfomrane, instead of a normal loop based nlp(text) we will be of using the .pipe() that process a batch of operations
 
-        for doc, doc_id in _WORKER_NLP.pipe(text_stream, as_tuples=True, batch_size=self.batch_size):
-            concepts, quantity_count, entity_count = self._extract_content_and_quantities(doc)
+        for doc, doc_id in _WORKER_NLP.pipe(text_stream, as_tuples=True, batch_size=batch_size):
+            concepts, quantity_count, entity_count = PulseGridDepthScorer._extract_content_and_quantities(doc, max_phrase_len)
             total_concepts = len(concepts)
-            mattr = self._compute_mattr(concepts)
+            mattr = PulseGridDepthScorer._compute_mattr(concepts, window_size)
 
             #once we get all this required components, as of next part we have to implement the calculation for 
             #the final ContentDepth score.
@@ -339,6 +343,7 @@ class PulseGridDepthScorer:
         last_seen_id = None  #used to track the cursor of the last seen id
 
         # Boot up the ProcessPoolExecutor once for the entire pipeline run
+        logger.info("trying to start the processs")
         with ProcessPoolExecutor(
             max_workers=self.max_workers,
             initializer=_init_worker, #this is used to initiate the workers with the scapy model
@@ -348,7 +353,7 @@ class PulseGridDepthScorer:
             # Use a while loop to pull and process batches until no articles remain
             while True:
                 query: dict[str, Any] = {
-                    "status": {"$ne": "MATTR"}
+                    # "status": {"$ne": "MATTR"}
                 }
                 if last_seen_id:
                     query["_id"] = {"$gt": last_seen_id}
@@ -376,7 +381,7 @@ class PulseGridDepthScorer:
                     break
 
                 # Dispatch this exact chunk directly to the worker pool
-                task = loop.run_in_executor(pool, self.process_batch, chunk) #handing the small chunks of the data to the saperate executor
+                task = loop.run_in_executor(pool, PulseGridDepthScorer.process_batch, chunk, self.batch_size, self.max_phrase_len, self.window_size) #handing the small chunks of the data to the saperate executor
                 scored_results = await task
                 
                 if scored_results:
