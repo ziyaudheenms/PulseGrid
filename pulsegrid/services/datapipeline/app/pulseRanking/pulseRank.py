@@ -10,6 +10,7 @@ from typing import Any
 from bson import ObjectId
 
 import structlog
+from pymongo import UpdateOne
 from pymongo.errors import BulkWriteError
 from pymongo.asynchronous.database import AsyncDatabase
 
@@ -40,7 +41,7 @@ class PulseRank:
         self.genunity_low_threshold = 0.30
         self.genunity_hihg_threshold = 0.60
         self.popularity_factor_weight = 0.40  # Weight for the popularity factor in the final score
-    async def rank_collections(self) -> None:
+    async def rank_collections(self) -> bool:
         """
         We will be implementing the fetching of the records from the collection with the cursor based approch
         """
@@ -50,7 +51,7 @@ class PulseRank:
             batch_size=self.batch_size
         )
 
-        batch_final_processing_result =[]
+        batch_final_processing_result: list[bool] = []
 
         while True:
     
@@ -82,7 +83,7 @@ class PulseRank:
                 },
             ]
 
-            cursor = self.collection.aggregate(pipeline)
+            cursor = await self.collection.aggregate(pipeline)
 
             #cursor will contain the documents from the collection with the articles joined in the articles field
 
@@ -117,7 +118,7 @@ class PulseRank:
 
 
 
-        if False in batch_final_processing_result:
+        if not all(batch_final_processing_result):
             logger.info(
                 "All batches havent compltly processed genunity score",
                 results = batch_final_processing_result
@@ -128,7 +129,7 @@ class PulseRank:
                 results = batch_final_processing_result
             )
             
-        return
+        return all(batch_final_processing_result)
 
 
 
@@ -137,7 +138,7 @@ class PulseRank:
         self,
         collection_documents: list[dict[str, Any]],
         batch_id: str,
-    ) -> None:
+    ) -> bool:
         """
         Using asyncio we will fire up all the documents if the batch and will control them using the semaphore to limit the concurrency of the ranking process 
         """
@@ -147,7 +148,7 @@ class PulseRank:
                 batch_id=batch_id
             )
 
-            return
+            return True
         
         logger.info(
             "Starting ranking for batch",
@@ -155,19 +156,38 @@ class PulseRank:
             num_collections=len(collection_documents)
         )
 
-        tasks = [self._start_ranking_collection(collection_document) for collection_document in collection_documents]
+        tasks = [self._start_ranking_collection(collection_document, batch_id) for collection_document in collection_documents]
         
-        results: list[dict[str, Any]| None] = await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        reports: list[dict[str, Any]] = []
+        failed_collections = False
+        #filtering out the error returned task responce and only adding the succedded ones to the reports list
+        for result in results:
+            if isinstance(result, BaseException):
+                if isinstance(result, asyncio.CancelledError):
+                    raise result
+                failed_collections = True
+                logger.error(
+                    "Failed to rank collection",
+                    batch_id=batch_id,
+                    error=str(result),
+                )
+            elif result is not None:
+                reports.append(result)
 
         logger.info(
             "Completed ranking for batch",
             batch_id=batch_id,
             num_collections=len(collection_documents),
-            results=results
+            ranked_collections=len(reports),
+            failed_collections=failed_collections,
         )
 
         #we have to update our collection with the final scores and the best article id for each collection
-        bool_result = await self._update_bulk_collection_score(collection_documents=results, batch_id = batch_id)
+        bool_result = await self._update_bulk_collection_score(
+            collection_analysis_reports=reports,
+            batch_id=batch_id,
+        )
 
         logger.info(
             "Completed the updation in the db for the batch",
@@ -176,16 +196,19 @@ class PulseRank:
             update_success=bool_result
         )
 
-        return bool_result
+        return bool_result 
 
-    async def _start_ranking_collection(self, collection_document: dict[str, Any], batch_id: str) -> None:
+    async def _start_ranking_collection(
+        self,
+        collection_document: dict[str, Any],
+        batch_id: str,
+    ) -> dict[str, Any] | None:
         """
         Here , in this function we will implement the ranking of the collection and the articles inside it.
         """
 
         async with self.semaphore:
             collection_id = collection_document.get("_id")
-            article_ids = collection_document.get("article_ids")
             articles = collection_document.get("articles")
 
             if not articles:
@@ -200,8 +223,13 @@ class PulseRank:
 
             #we have to get into each articles and perform some clean up operations
             for article in articles:
-                genunity_score = article.get("genunity_score", 0)
-                ranking_depth_score = article.get("ranking_depth_score", 0)
+                genunity_score = article.get("genunity_score")
+                if genunity_score is None:
+                    genunity_score = 0
+
+                ranking_depth_score = article.get("ranking_depth_score")
+                if ranking_depth_score is None:
+                    ranking_depth_score = 0
 
                 logger.info(
                     "Ranking article",
@@ -248,6 +276,18 @@ class PulseRank:
 
             id_of_the_best_article_score = articles[article_final_scores.index(artcile_with_max_score)].get("_id")
 
+            #checking thw type of the id whter it is a string or ObjectID type
+            if isinstance(id_of_the_best_article_score, str) and ObjectId.is_valid(id_of_the_best_article_score):
+                id_of_the_best_article_score = ObjectId(id_of_the_best_article_score)
+            elif not isinstance(id_of_the_best_article_score, ObjectId):
+                logger.error(
+                    "Invalid best article ObjectId",
+                    collection_id=collection_id,
+                    article_id=id_of_the_best_article_score,
+                    batch_id=batch_id,
+                )
+                id_of_the_best_article_score = None
+
 
             logger.info(
                 "Completed the analysis and tweaked the final scores",
@@ -268,39 +308,36 @@ class PulseRank:
             return collection_analysis_report
 
 
-    async def _update_bulk_collection_score(self, collection_analysis_reports: list[dict[str, Any]], batch_id: str) -> None:
+    async def _update_bulk_collection_score(
+        self,
+        collection_analysis_reports: list[dict[str, Any]],
+        batch_id: str,
+    ) -> bool:
         """
         This function will update the collection with the final scores and the best article id for each collection
         """
-        N = len(collection_analysis_reports)
-        
         if not collection_analysis_reports:
             logger.info(
                 "No collection analysis reports to update.",
                 batch_id=batch_id
             )
-            return
+            return True
 
-        bulk_operations = []
-        for report in collection_analysis_reports:
-            if report is None:
-                continue  # Skip None reports
-
-            bulk_operations.append(
+        bulk_operations = [
+            UpdateOne(
+                {"_id": report["_id"]},
                 {
-                    "update_one": {
-                        "filter": {"_id": report["_id"]},
-                        "update": {
-                            "$set": {
-                                "quality_factor": report["quality_factor"],
-                                "popularity_factor": report["popularity_factor"],
-                                "final_collection_score": report["final_collection_score"],
-                                "best_article_id": ObjectId(report["best_article_id"]),
-                            }
-                        },
+                    "$set": {
+                        "quality_factor": report["quality_factor"],
+                        "popularity_factor": report["popularity_factor"],
+                        "final_collection_score": report["final_collection_score"],
+                        "best_article_id": report["best_article_id"],
                     }
-                }
+                },
             )
+            for report in collection_analysis_reports
+        ]
+        record_count = len(bulk_operations)
 
         try:
             # 1. Execute bulk write and capture the acknowledgment result object
@@ -312,33 +349,36 @@ class PulseRank:
             
             logger.info(
                 "Saved genunity scores to database",
-                record_count=N,
+                record_count=record_count,
                 batch_id=batch_id,
                 matched_count=matched,
                 modified_count=modified,
             )
 
             #modified sometimes comes less becase may be if the updating value exists, the modified doesnt counts
-            return matched == N
+            return matched == record_count
 
         except BulkWriteError as bwe:
             # 3. Handle partial failures if `ordered=False` encounters specific document errors
             details = bwe.details
-            successful_modifications = details.get("nModified", 0)
+            matched_count = details.get("nMatched", 0)
+            write_errors = details.get("writeErrors", [])
+            write_concern_errors = details.get("writeConcernErrors", [])
             logger.warning(
                 "Bulk write completed with errors",
-                record_count=N,
+                record_count=record_count,
                 batch_id=batch_id,
-                modified_count=successful_modifications,
-                write_error_count=len(details.get("writeErrors", [])),
+                matched_count=matched_count,
+                write_error_count=len(write_errors),
+                write_concern_error_count=len(write_concern_errors),
             )
-            return successful_modifications == N
+            return matched_count == record_count
 
         except Exception as e:
             # 4. Handle catastrophic network or connection drops
             logger.error(
                 "Unexpected database error during bulk write",
-                record_count=N,
+                record_count=record_count,
                 batch_id=batch_id,
                 error=str(e),
                 exc_info=True,
@@ -346,4 +386,4 @@ class PulseRank:
             return False
         
         
-            
+         

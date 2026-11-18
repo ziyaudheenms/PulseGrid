@@ -153,3 +153,16 @@ async def implement_depth_analysis():
         message="depth analysis task successfully enqueued.",
         data=f"Job ID: {job.id}"
     )
+
+
+@router.post("/ranking", response_model=ApiResponseSchema[str])
+async def implement_ranking():
+    """Enqueue ranking for all article collections."""
+    queue = get_queue('data_pipeline')
+    job = await queue.add("implement_ranking", {})
+
+    return ApiResponseSchema(
+        status_code=200,
+        message="Ranking task successfully enqueued.",
+        data=f"Job ID: {job.id}"
+    )

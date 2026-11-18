@@ -6,6 +6,7 @@ from pulseClean.embedEngine import PulseCleanEmbedd
 from pulseClean.pulseClassify import  PulseClassify
 from pulseRanking.clickBait import PulseBaitAnalysis
 from pulseRanking.depthAnalysis import PulseGridDepthScorer
+from pulseRanking.pulseRank import PulseRank
 
 from core.database import get_database
 from core.config import settings
@@ -95,4 +96,16 @@ async def implement_depth_analysis(job: Job):
     )
     await depth_analyzer.run_pipeline()
 
-   
+
+async def implement_ranking_handler(job: Job):
+    logger.info("Starting collection ranking", job_name=job.name)
+    db = await get_database()
+
+    ranker = PulseRank(
+        db=db,
+        concurrency_limit=5,
+        max_retries=3,
+    )
+
+    await ranker.rank_collections()
+        
