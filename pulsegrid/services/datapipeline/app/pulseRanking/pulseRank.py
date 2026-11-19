@@ -317,10 +317,10 @@ class PulseRank:
 
 
             #now we have to add the popularity factor to the final score of the collection so that to make ut complete
-            popularity_factor = 1 + self.popularity_factor_weight * math.log10(N)  # Assuming each article contributes equally to the popularity
+            popularity_factor = 1 + self.popularity_factor_weight * math.log10(N) if N > 1 else 0  # Assuming each article contributes equally to the popularity
 
-            #now we have to combine both together and have to update final collection score
-            final_collection_score  = 0.55 * quality_factor + 0.45 * popularity_factor  # Weighted average of quality and popularity factors
+            #now we have to combine both together and have to update final qu score
+            final_collection_score  = 0.55 * popularity_factor + 0.45 * quality_factor  # Weighted average of quality and popularity factors
             #55% of the final score is defined by the quality factor and 45% is defined by the popularity factor
 
             id_of_the_best_article_score = articles[article_final_scores.index(artcile_with_max_score)].get("_id")
