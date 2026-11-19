@@ -39,12 +39,48 @@ class PulseRank:
         self.max_retries = max_retries
         self.batch_size = batch_size
         self.genunity_low_threshold = 0.30
-        self.genunity_hihg_threshold = 0.60
+        self.genunity_hihg_threshold = 0.65
         self.popularity_factor_weight = 0.40  # Weight for the popularity factor in the final score
+        self.max_depth: float | None = None
+        self.min_depth: float | None = None
+
+    async def _load_depth_percentiles(self) -> tuple[float | None, float | None]:
+        pipeline = [
+            {"$match": {"ranking_depth_score": {"$type": "number"}}},
+            {
+                "$group": {
+                    "_id": None,
+                    "depth_percentiles": {
+                        "$percentile": {
+                            "input": "$ranking_depth_score",
+                            "p": [0.05, 0.95],
+                            "method": "approximate",
+                        }
+                    },
+                }
+            },
+        ]
+
+        cursor = await self.article_collection.aggregate(pipeline)
+        results = await cursor.to_list(length=1)
+
+        if not results:
+            self.min_depth = None
+            self.max_depth = None
+            logger.warning("No numeric ranking depth scores found.")
+            return self.max_depth, self.min_depth
+
+        percentiles = results[0]["depth_percentiles"]
+        self.min_depth = float(percentiles[0])
+        self.max_depth = float(percentiles[1])
+        return self.max_depth, self.min_depth
+
     async def rank_collections(self) -> bool:
         """
         We will be implementing the fetching of the records from the collection with the cursor based approch
         """
+        await self._load_depth_percentiles()
+
         last_seen_id = None
         logger.info(
             "Initializing the Ranking process for the batch of collections",
@@ -231,12 +267,25 @@ class PulseRank:
                 if ranking_depth_score is None:
                     ranking_depth_score = 0
 
+                if self.min_depth is not None and self.max_depth is not None:
+                    depth_range = self.max_depth - self.min_depth
+                    if depth_range > 0:
+                        normalized_depth_score = max(
+                            0.0,
+                            min(1.0, (ranking_depth_score - self.min_depth) / depth_range),
+                        )
+                    else:
+                        normalized_depth_score = 0.0
+                else:
+                    normalized_depth_score = 0.0
+
                 logger.info(
                     "Ranking article",
                     collection_id=collection_id,
                     article_id=article.get("_id"),
                     genunity_score=genunity_score,
                     ranking_depth_score=ranking_depth_score,
+                    normalized_depth_score=normalized_depth_score,
                     batch_id=batch_id
                 )
 
@@ -258,7 +307,7 @@ class PulseRank:
                     batch_id=batch_id
                 )
 
-                article_scoring = adjusted_t * ranking_depth_score #the final score of the article that which we are going to use
+                article_scoring = adjusted_t * normalized_depth_score #the final score of the article that which we are going to use
                 article_final_scores.append(article_scoring)
 
             artcile_with_max_score = max(article_final_scores)

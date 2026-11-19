@@ -301,7 +301,13 @@ class PulseGridDepthScorer:
             #first we hae to handle a case like a short para with some uniqe words may get more more mattr while a long para with good amount of unique gets low
             #we will be using the log10 factor
 
-            base_depth = mattr * math.log10(total_concepts + 1) if total_concepts > 0 else 0.0
+            #one bug we found out is thay if total_concepts is too large it can affect the depth score
+            #mattr is indepentent of the length of the content there fore we will cap it beyond a certain limit
+
+            MAX_CONCEPTS = 1000  
+            capped = min(total_concepts, MAX_CONCEPTS)
+
+            base_depth = mattr * math.log10(capped + 1) if capped > 0 else 0.0
 
             #now we have to encoperate the no of enitties and quantities that has beein  used in the article
             #thing to note is that mattr score should dominate , so that depth analysis stays relevant , therefore only 20% will be the other factors add to the final depth scoreee
