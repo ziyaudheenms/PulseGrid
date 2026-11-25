@@ -1,5 +1,5 @@
 """
-This agent analyzes similarities, conflicts, and framing across every article in a collection.
+This agent analyzes similarities, dissimilarities, and framing across every article in a collection.
 
 This prompt is used for collections with up to two articles.
 """
@@ -39,19 +39,22 @@ def single_agent_summarizer_task_spec_prompt() -> str:
          separate items; do not combine unrelated facts into one sentence or paragraph.
        - Do not put an uncorroborated claim here merely because it appears plausible.
 
-    3. FACTUAL CONFLICTS AND QUALIFICATIONS
-       - Report material factual disagreements, including incompatible figures, dates,
-         causes, sequences, or descriptions. For each, state what each relevant source
-         reports and identify the source by its supplied name.
+    3. DISSIMILARITIES AND FACTUAL DISAGREEMENTS
+       - Include material differences and factual contradictions together in the
+         "dissimilarities" array. This includes differing emphasis, details, figures,
+         dates, causes, sequences, and descriptions. For each, state what each relevant
+         source reports and identify the source by its supplied name.
        - Preserve the conditions attached to figures and claims (for example, peak-load
          tests versus average normal traffic). Do not collapse measurements from different
          conditions into one directly comparable number.
        - Distinguish an actual contradiction from different levels of detail, different
          measurement scopes, or a claim that another article simply does not mention.
          Silence is not a denial: describe a source as not specifying a detail only when
-         that absence is relevant, and never frame it as contradictory evidence.
-       - Do not force a conflict where the articles are compatible. If there are no
-         material factual conflicts, return an empty factual_conflicts array.
+         that          absence is relevant, and never frame it as contradictory evidence. Include
+         genuine contradictions as dissimilarity items, explaining each relevant
+         source's claim in the same item without a separate label or notation.
+       - Do not force a contradiction where the articles are compatible. If there are no
+         material differences or contradictions, return an empty dissimilarities array.
 
     4. FRAMING AND SUMMARY
        - Assess meaningful differences in emphasis or interpretation only when the text
@@ -71,15 +74,16 @@ def single_agent_summarizer_task_spec_prompt() -> str:
        - Do not combine quantities into one range when their metrics, populations,
          timeframes, methods, or conditions differ. In that case, keep the figures
          distinct and explain the relevant difference in scope. Preserve the individual
-         source figures and qualifications in factual_conflicts when applicable.
+         source figures and qualifications in the relevant dissimilarity item when
+         applicable.
        - Ensure every specific claim and comparison is traceable to the supplied sources.
 
     5. REQUIRED OUTPUT
        Return only valid JSON with exactly these top-level keys and value types:
        - "unified_summary": a string.
        - "shared_facts": an array of strings.
-       - "factual_conflicts": an array of objects. Each object has exactly:
-         "conflict_topic" (string) and "how_sources_report_it" (string).
+       - "dissimilarities": an array of objects. Each object has exactly:
+         "difference_topic" (string) and "how_sources_report_it" (string).
        Do not add markdown fences, introductory text, citations to outside material, or
        additional keys. Use [] for an empty array. Keep source names and relevant
        qualifications in the strings so readers can trace the comparison.
@@ -105,9 +109,9 @@ def single_agent_summarizer_task_spec_prompt() -> str:
         "The sources report that Discord moved its Read States service from Go to Rust.",
         "The sources attribute regular latency spikes to Go's garbage-collection cycles."
       ],
-      "factual_conflicts": [
+      "dissimilarities": [
         {
-          "conflict_topic": "Reported latency improvement",
+          "difference_topic": "Reported latency improvement",
           "how_sources_report_it": "Source A reports a 40% reduction in p99 tail latency in peak-load tests, while Source B reports a 25% average reduction across normal traffic. These figures use different measures and conditions, so they are not necessarily contradictory or directly comparable. Source C does not report a percentage; that omission is not a conflicting claim."
         }
       ]

@@ -1,7 +1,7 @@
 """
 Summarizer agent is the core agent that which analyses the articles of the collection and generates the 
-precise summary about them, along with the similarities they have, conflicts, and how each conflict is managed
-by each article
+precise summary about them, along with their similarities and dissimilarities, including
+factual contradictions and how each article reports them
 
 we will implement the structured output for getting back the responce as we need.
 """
