@@ -34,6 +34,9 @@ def single_agent_summarizer_task_spec_prompt() -> str:
        - Make source coverage clear in each item (name the supporting sources when the
          input provides names). Do not imply that every source supports a fact if one or
          more do not.
+       - Write shared_facts point by point: each array item must be one standalone,
+         complete sentence describing one distinct shared fact. Put separate facts in
+         separate items; do not combine unrelated facts into one sentence or paragraph.
        - Do not put an uncorroborated claim here merely because it appears plausible.
 
     3. FACTUAL CONFLICTS AND QUALIFICATIONS
@@ -60,6 +63,15 @@ def single_agent_summarizer_task_spec_prompt() -> str:
          source-specific figures or claims, and preserve the conditions under which they
          were reported. Avoid vague generalities, repetition of the arrays, and unsupported
          conclusions; every sentence should add material information.
+       - When multiple sources report different quantities for the same metric under
+         comparable conditions, summarize the span using the lowest and highest reported
+         values (for example, reports of 45%, 50%, and 55% become "reported estimates
+         ranged from 45% to 55%"). Make clear that this is the range of source-reported
+         figures, not a single verified measurement, and retain relevant attribution.
+       - Do not combine quantities into one range when their metrics, populations,
+         timeframes, methods, or conditions differ. In that case, keep the figures
+         distinct and explain the relevant difference in scope. Preserve the individual
+         source figures and qualifications in factual_conflicts when applicable.
        - Ensure every specific claim and comparison is traceable to the supplied sources.
 
     5. REQUIRED OUTPUT
@@ -88,7 +100,7 @@ def single_agent_summarizer_task_spec_prompt() -> str:
 
     Output:
     {
-      "unified_summary": "Discord migrated its Read States service from Go to Rust after Go's garbage-collection cycles caused regular latency spikes. The articles report latency improvements, but the figures use different measures and traffic conditions: Source A reports a 40% p99 tail-latency reduction in peak-load tests, while Source B reports a 25% average reduction across normal traffic. Source C gives no percentage, so its article does not confirm or contradict either reported figure.",
+      "unified_summary": "Discord migrated its Read States service from Go to Rust after Go's garbage-collection cycles caused regular latency spikes.",
       "shared_facts": [
         "The sources report that Discord moved its Read States service from Go to Rust.",
         "The sources attribute regular latency spikes to Go's garbage-collection cycles."
